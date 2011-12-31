@@ -1,0 +1,318 @@
+//
+//  CZScript.m
+//  ScriptSync
+//
+//  Created by Curtis Jones on 2010.09.15.
+//  Copyright 2010 Nexidia, Inc. All rights reserved.
+//
+
+#import "CZScript+DBObject.h"
+#import "CZDocument+DBObject.h"
+#import "CZGroup+DBObject.h"
+#import "CZScriptStyle+DBObject.h"
+#import "CZScriptTextStorage.h"
+#import "CZLinkedList.h"
+#import "DBConnection.h"
+#import "DBResult.h"
+#import "DBStatement.h"
+#import "Easy.h"
+
+@interface CZScript (DBObjectPrivate)
+- (CZScript *)__dbobjectHandleResult:(DBResult *)result;
+@end
+
+@implementation CZScript (DBObject)
+
+/**
+ *
+ *
+ */
++ (NSArray *)dbobjectSelectAllForDocument:(CZDocument *)document
+{
+	BOOL retval = TRUE;
+	DBConnection *connection = nil;
+	DBResult *result = nil;
+	DBStatement *statement = nil;
+	CZScript *object = nil;
+	NSMutableArray *objects = [NSMutableArray array];
+	
+	// from the document to the db connection
+	if (nil == (connection = document.dbconnection))
+		@throw [NSException exceptionWithName:CZExceptionNoDbConnection reason:@"No connection associated with this document." userInfo:nil];
+	
+	// get the prepared statement for this operation
+	if (nil == (statement = [connection statementForName:@"script_select_all"]))
+		@throw [NSException exceptionWithName:CZExceptionNoStatement reason:@"Could not find the required statement" userInfo:nil];
+	
+	// execute statement
+	if (![connection exec:statement result:&result])
+		CZ_DBOBJ_ERROR(statement,retval,done);
+	
+	// handle result
+	CZ_DBOBJ_HANDLE([CZScript script], @selector(__addCachedScript:));
+	
+	// initialize the text storage thingy for each script. disable the undo manager for each script.
+	// after we've finished loading whatever it is that we want to load, we'll re-enable it.
+	for (CZScript *script in objects) {
+		script.textStorage = [[[CZScriptTextStorage alloc] initWithScript:script] autorelease];
+		[script.undoManager disableUndoRegistration];
+	}
+	
+done:
+	[statement clear];
+	return objects;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)dbobjectInsert
+{
+	BOOL retval = TRUE;
+	DBConnection *connection = nil;
+	DBResult *result = nil;
+	DBStatement *statement = nil;
+	NSUInteger databaseId;
+	
+	// from the document to the db connection
+	if (nil == (connection = self.document.dbconnection))
+		@throw [NSException exceptionWithName:CZExceptionNoDbConnection reason:@"No connection associated with this script." userInfo:nil];
+	
+	// get the prepared statement for this operation
+	if (nil == (statement = [connection statementForName:@"script_insert"]))
+		@throw [NSException exceptionWithName:CZExceptionNoStatement reason:@"Could not find the required statement" userInfo:nil];
+	
+	// if this object already has a database key then don't insert it again
+	if (mDatabaseId != 0)
+		@throw [NSException exceptionWithName:CZExceptionIllegalOperation reason:@"Can not insert an already inserted object" userInfo:nil];
+	
+	// setup
+	{
+		if (mGroupId != 0 || 0 != (mGroupId = mGroup.databaseId))
+			[statement bindUint32:mGroupId atIndex:1];
+		else
+			[statement bindNullAtIndex:1];
+		
+		[statement bindString:mName atIndex:2];
+		
+		if ([mPath length] != 0)
+			[statement bindString:mPath atIndex:3];
+		else
+			[statement bindNullAtIndex:3];
+		
+		if (mScriptStyleId != 0 || 0 != (mScriptStyleId = mStyle.databaseId))
+			[statement bindUint32:mScriptStyleId atIndex:4];
+		else
+			[statement bindNullAtIndex:4];
+		
+		// since this is a script insert there's no way that we have id's for any script elements yet.
+		// however, for future flexibility, we'll check to make sure and honor any existing values.
+		if (mHeadId != 0 || 0 != (mHeadId = ((CZElement *)mElements.head).databaseId))
+			[statement bindUint32:mHeadId atIndex:5];
+		else
+			[statement bindNullAtIndex:5];
+		
+		// since this is a script insert there's no way that we have id's for any script elements yet.
+		// however, for future flexibility, we'll check to make sure and honor any existing values.
+		if (mTailId != 0 || 0 != (mTailId = ((CZElement *)mElements.tail).databaseId))
+			[statement bindUint32:mTailId atIndex:6];
+		else
+			[statement bindNullAtIndex:6];
+	}
+	
+	// execute statement
+	if (![connection exec:statement result:&result])
+		CZ_DBOBJ_ERROR(statement,retval,done);
+	
+	// get primary key
+	if (TRUE == [connection lastInsertRowId:&databaseId]) {
+		self.databaseId = databaseId;
+		[self.document __addCachedScript:(CZScript *)[self dbobjectCopy]];
+	}
+	else
+		NSLog(@"%s.. failed to lastInsertRowId()", __PRETTY_FUNCTION__);
+	
+done:
+	[statement clear];
+	return retval;
+}
+
+/**
+ * Update the script record itself. This doesn't do anything related to the element's in the script.
+ *
+ */
+- (BOOL)dbobjectUpdate
+{
+	BOOL retval = TRUE;
+	DBConnection *connection = nil;
+	DBResult *result = nil;
+	DBStatement *statement = nil;
+	
+	// from the document to the db connection
+	if (nil == (connection = self.document.dbconnection))
+		@throw [NSException exceptionWithName:CZExceptionNoDbConnection reason:@"No connection associated with this script." userInfo:nil];
+	
+	// get the prepared statement for this operation
+	if (nil == (statement = [connection statementForName:@"script_update_by_id"]))
+		@throw [NSException exceptionWithName:CZExceptionNoStatement reason:@"Could not find the required statement" userInfo:nil];
+	
+	// the record must already have been inserted before we can attempt to update it
+	if (mDatabaseId == 0)
+		@throw [NSException exceptionWithName:CZExceptionIllegalOperation reason:@"Can not update a record that hasn't yet been inserted" userInfo:nil];
+	
+	// setup
+	{
+		if (mGroupId != 0 || 0 != (mGroupId = mGroup.databaseId))
+			[statement bindUint32:mGroupId atIndex:1];
+		else
+			[statement bindNullAtIndex:1];
+		
+		[statement bindString:mName atIndex:2];
+		
+		if ([mPath length] != 0)
+			[statement bindString:mPath atIndex:3];
+		else
+			[statement bindNullAtIndex:3];
+		
+		if (mScriptStyleId != 0 || 0 != (mScriptStyleId = mStyle.databaseId))
+			[statement bindUint32:mScriptStyleId atIndex:4];
+		else
+			[statement bindNullAtIndex:4];
+		
+		// since this is a script insert there's no way that we have id's for any script elements yet.
+		// however, for future flexibility, we'll check to make sure and honor any existing values.
+		if (mHeadId != 0 || 0 != (mHeadId = ((CZElement *)mElements.head).databaseId))
+			[statement bindUint32:mHeadId atIndex:5];
+		else
+			[statement bindNullAtIndex:5];
+		
+		// since this is a script insert there's no way that we have id's for any script elements yet.
+		// however, for future flexibility, we'll check to make sure and honor any existing values.
+		if (mTailId != 0 || 0 != (mTailId = ((CZElement *)mElements.tail).databaseId))
+			[statement bindUint32:mTailId atIndex:6];
+		else
+			[statement bindNullAtIndex:6];
+		
+		[statement bindUint32:mDatabaseId atIndex:7];
+	}
+	
+	if ([[self.document __getCachedScriptForScript:self] dbobjectCompare:self] == DBObjectComparisonEquals)
+		goto done;
+	
+	// execute statement
+	if (![connection exec:statement result:&result])
+		CZ_DBOBJ_ERROR(statement,retval,done);
+	
+	[self.document __addCachedScript:(CZScript *)[self dbobjectCopy]];
+	
+done:
+	[statement clear];
+	return retval;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)dbobjectDelete
+{
+	BOOL retval = TRUE;
+	DBConnection *connection = nil;
+	DBResult *result = nil;
+	DBStatement *statement = nil;
+	
+	// from the document to the db connection
+	if (nil == (connection = self.document.dbconnection))
+		@throw [NSException exceptionWithName:CZExceptionNoDbConnection reason:@"No connection associated with this script." userInfo:nil];
+	
+	// get the prepared statement for this operation
+	if (nil == (statement = [connection statementForName:@"script_delete_by_id"]))
+		@throw [NSException exceptionWithName:CZExceptionNoStatement reason:@"Could not find the required statement" userInfo:nil];
+	
+	// the record must already have been inserted before we can attempt to delete it
+	if (mDatabaseId == 0)
+		@throw [NSException exceptionWithName:CZExceptionIllegalOperation reason:@"Can not delete a record that hasn't yet been inserted" userInfo:nil];
+	
+	// setup
+	[statement bindUint32:mDatabaseId atIndex:1];
+	
+	// execute statement
+	if (![connection exec:statement result:&result])
+		CZ_DBOBJ_ERROR(statement,retval,done);
+	
+	[[self retain] autorelease];
+	[self.document __removeScript:self];
+	[self.document __removeCachedScript:self];
+	
+done:
+	[statement clear];
+	return retval;
+}
+
+/**
+ *
+ *
+ */
+- (DBObjectComparisonResult)dbobjectCompare:(id<DBObject>)anObject
+{
+	CZScript *script = (CZScript *)anObject;
+	
+	if (script->mLength == mLength &&
+			script->mName == mName &&
+			script->mPath == mPath &&
+			script->mStyle == mStyle &&
+			script->mGroupId == mGroupId &&
+			script->mScriptStyleId == mScriptStyleId &&
+			script->mHeadId == mHeadId &&
+			script->mTailId == mTailId)
+		return DBObjectComparisonEquals;
+	else
+		return DBObjectComparisonNotEquals;
+}
+
+/**
+ *
+ *
+ */
+- (id<DBObject>)dbobjectCopy
+{
+	CZScript *script = [self copy];
+	
+	script->mLength = mLength;
+	script->mName = [mName retain];
+	script->mPath = [mPath retain];
+	script->mStyle = [mStyle retain];
+	script->mGroupId = mGroupId;
+	script->mScriptStyleId = mScriptStyleId;
+	script->mHeadId = mHeadId;
+	script->mTailId = mTailId;
+	
+	return script;
+}
+
+
+
+
+
+#pragma mark -
+#pragma mark Private
+
+/**
+ *
+ *
+ */
+- (CZScript *)__dbobjectHandleResult:(DBResult *)result
+{
+	[result getUint32:&mDatabaseId atColumn:0];
+	[result getUint32:&mGroupId atColumn:1];
+	[result getString:&mName atColumn:2];
+	[result getString:&mPath atColumn:3];
+	[result getUint32:&mScriptStyleId atColumn:4];
+	[result getUint32:&mHeadId atColumn:5];
+	[result getUint32:&mTailId atColumn:6];
+	
+	return self;
+}
+
+@end

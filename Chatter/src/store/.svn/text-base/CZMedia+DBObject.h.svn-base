@@ -1,0 +1,22 @@
+//
+//  CZMedia.h
+//  ScriptSync
+//
+//  Created by Curtis Jones on 2010.09.27.
+//  Copyright 2010 Nexidia, Inc. All rights reserved.
+//
+
+#import <Cocoa/Cocoa.h>
+#import "CZMedia.h"
+#import "DBObject.h"
+
+@class CZDocument;
+
+@interface CZMedia (DBObject) <DBObject>
+
+/**
+ *
+ */
++ (NSArray *)dbobjectSelectAllForDocument:(CZDocument *)document;
+
+@end

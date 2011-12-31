@@ -1,0 +1,257 @@
+//
+//  CZMetadata+DBObject.m
+//  ScriptSync
+//
+//  Created by Curtis Jones on 2011.03.09.
+//  Copyright 2011 Nexidia, Inc. All rights reserved.
+//
+
+#import "CZMetadata+DBObject.h"
+#import "CZDocument+DBObject.h"
+#import "DBObject.h"
+#import "DBConnection.h"
+#import "DBResult.h"
+#import "DBStatement.h"		
+#import "Easy.h"
+
+@interface CZMetadata (PrivateMethods)
+- (CZMetadata *)__dbobjectHandleResult:(DBResult *)result;
+@end
+
+@implementation CZMetadata (DBObject)
+
+/**
+ *
+ *
+ */
++ (NSArray *)dbobjectSelectAllForDocument:(CZDocument *)document
+{
+	BOOL retval = TRUE;
+	DBConnection *connection = nil;
+	DBResult *result = nil;
+	DBStatement *statement = nil;
+	CZMetadata *object = nil;
+	NSMutableArray *objects = [NSMutableArray array];
+	
+	// from the document to the db connection
+	if (nil == (connection = document.dbconnection))
+		@throw [NSException exceptionWithName:CZExceptionNoDbConnection reason:@"No connection associated with this document." userInfo:nil];
+	
+	// get the prepared statement for this operation
+	if (nil == (statement = [connection statementForName:@"metadata_select_all"]))
+		@throw [NSException exceptionWithName:CZExceptionNoStatement reason:@"Could not find the required statement" userInfo:nil];
+	
+	// execute statement
+	if (![connection exec:statement result:&result])
+		CZ_DBOBJ_ERROR(statement,retval,done);
+	
+	// handle result
+	CZ_DBOBJ_HANDLE([CZMetadata metadata], @selector(__addCachedMetadata:));
+	
+done:
+	[statement clear];
+	return objects;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)dbobjectInsert
+{
+	BOOL retval = TRUE;
+	DBConnection *connection = nil;
+	DBResult *result = nil;
+	DBStatement *statement = nil;
+	NSUInteger databaseId;
+	
+	// from the document to the db connection
+	if (nil == (connection = self.document.dbconnection))
+		@throw [NSException exceptionWithName:CZExceptionNoDbConnection reason:@"No connection associated with this document." userInfo:nil];
+	
+	// get the prepared statement for this operation
+	if (nil == (statement = [connection statementForName:@"metadata_insert"]))
+		@throw [NSException exceptionWithName:CZExceptionNoStatement reason:@"Could not find the required statement" userInfo:nil];
+	
+	// if this object already has a database key then don't insert it again
+	if (mDatabaseId != 0)
+		@throw [NSException exceptionWithName:CZExceptionIllegalOperation reason:@"Can not insert an already inserted object" userInfo:nil];
+	
+	// setup
+	{
+		[statement bindString:mLabel atIndex:1];
+		[statement bindString:mType atIndex:2];
+		[statement bindString:[mValue description] atIndex:3];
+	}
+	
+	// execute statement
+	if (![connection exec:statement result:&result])
+		CZ_DBOBJ_ERROR(statement,retval,done);
+	
+	// get primary key
+	if (TRUE == [connection lastInsertRowId:&databaseId]) {
+		self.databaseId = databaseId;
+		[self.document __addCachedMetadata:(CZMetadata *)[self dbobjectCopy]];
+	}
+	else
+		NSLog(@"%s.. failed to lastInsertRowId()", __PRETTY_FUNCTION__);
+	
+done:
+	[statement clear];
+	return retval;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)dbobjectUpdate
+{
+	BOOL retval = TRUE;
+	DBConnection *connection = nil;
+	DBResult *result = nil;
+	DBStatement *statement = nil;
+	
+	if ([[self.document __getCachedMetadataForMetadata:self] dbobjectCompare:self] == DBObjectComparisonEquals)
+		return TRUE;
+	
+	// from the document to the db connection
+	if (nil == (connection = self.document.dbconnection))
+		@throw [NSException exceptionWithName:CZExceptionNoDbConnection reason:@"No connection associated with this document." userInfo:nil];
+	
+	// get the prepared statement for this operation
+	if (nil == (statement = [connection statementForName:@"metadata_update_by_id"]))
+		@throw [NSException exceptionWithName:CZExceptionNoStatement reason:@"Could not find the required statement" userInfo:nil];
+	
+	// the record must already have been inserted before we can attempt to update it
+	if (mDatabaseId == 0)
+		@throw [NSException exceptionWithName:CZExceptionIllegalOperation reason:@"Can not update a record that hasn't yet been inserted" userInfo:nil];
+	
+	// setup
+	{
+		[statement bindString:mLabel atIndex:1];
+		[statement bindString:mType atIndex:2];
+		[statement bindString:[mValue description] atIndex:3];
+		[statement bindUint32:mDatabaseId atIndex:4];
+	}
+	
+	// execute statement
+	if (![connection exec:statement result:&result])
+		CZ_DBOBJ_ERROR(statement,retval,done);
+	
+	[self.document __addCachedMetadata:(CZMetadata *)[self dbobjectCopy]];
+	
+done:
+	[statement clear];
+	return retval;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)dbobjectDelete
+{
+	BOOL retval = TRUE;
+	DBConnection *connection = nil;
+	DBResult *result = nil;
+	DBStatement *statement = nil;
+	
+	// from the document to the db connection
+	if (nil == (connection = self.document.dbconnection))
+		@throw [NSException exceptionWithName:CZExceptionNoDbConnection reason:@"No connection associated with this document." userInfo:nil];
+	
+	// get the prepared statement for this operation
+	if (nil == (statement = [connection statementForName:@"metadata_delete_by_id"]))
+		@throw [NSException exceptionWithName:CZExceptionNoStatement reason:@"Could not find the required statement" userInfo:nil];
+	
+	// the record must already have been inserted before we can attempt to delete it
+	if (mDatabaseId == 0)
+		@throw [NSException exceptionWithName:CZExceptionIllegalOperation reason:@"Can not delete a record that hasn't yet been inserted" userInfo:nil];
+	
+	// setup
+	[statement bindUint32:mDatabaseId atIndex:1];
+	
+	// execute statement
+	if (![connection exec:statement result:&result])
+		CZ_DBOBJ_ERROR(statement,retval,done);
+	
+	[[self retain] autorelease];
+	[self.document __removeMetadata:self];
+	[self.document __removeCachedMetadata:self];
+	
+done:
+	[statement clear];
+	return retval;
+}
+
+/**
+ *
+ *
+ */
+- (DBObjectComparisonResult)dbobjectCompare:(id<DBObject>)anObject
+{
+	CZMetadata *metadata = (CZMetadata *)anObject;
+	
+	if ([metadata->mLabel isEqual:mLabel] &&
+			[metadata->mType isEqual:mType] &&
+			[metadata->mValue isEqual:mValue])
+		return DBObjectComparisonEquals;
+	else
+		return DBObjectComparisonNotEquals;
+}
+
+/**
+ *
+ *
+ */
+- (id<DBObject>)dbobjectCopy
+{
+	CZMetadata *metadata = [self copy];
+	
+	metadata->mLabel = [mLabel retain];
+	metadata->mType = [mType retain];
+	metadata->mValue = [mValue retain];
+	
+	return metadata;
+}
+
+
+
+
+
+#pragma mark -
+#pragma mark Private
+
+/**
+ *
+ *
+ */
+- (CZMetadata *)__dbobjectHandleResult:(DBResult *)result
+{
+	NSString *value = nil;
+	
+	[result getUint32:&mDatabaseId atColumn:0];
+	[result getString:&mLabel atColumn:1];
+	[result getString:&mType atColumn:2];
+	[result getString:&value atColumn:3];
+	
+	if ([mType isEqual:@"string"])
+		mValue = value;
+	else if ([mType isEqual:@"bool"])
+		mValue = [[NSNumber alloc] initWithBool:[value boolValue]];
+	else if ([mType isEqual:@"integer"])
+		mValue = [[NSNumber alloc] initWithInteger:[value integerValue]];
+	else if ([mType isEqual:@"double"])
+		mValue = [[NSNumber alloc] initWithDouble:[value doubleValue]];
+	else if ([mType isEqual:@"date"])
+		mValue = [[NSDate alloc] initWithString:value];
+//else if ([mType isEqual:@"timecode"])
+//	mValue = [[Timecode timecodeWithString:value] retain];
+	else
+		NSLog(@"%s.. unsupported metadata type, %@ for value, %@", __PRETTY_FUNCTION__, mType, value);
+	
+	return self;
+}
+
+@end

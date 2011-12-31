@@ -1,0 +1,18 @@
+//
+//  DBObject.m
+//  ScriptSync
+//
+//  Created by Curtis Jones on 2010.09.15.
+//  Copyright 2010 Nexidia, Inc. All rights reserved.
+//
+
+#import "DBObject.h"
+
+NSString * const CZExceptionNoDbConnection = @"CZExceptionNoDbConnection";
+NSString * const CZExceptionNoStatement = @"CZExceptionNoStatement";
+NSString * const CZExceptionDbAlreadyConnected = @"CZExceptionDbAlreadyConnected";
+NSString * const CZExceptionIllegalOperation = @"CZExceptionIllegalOperation";
+
+@implementation DBObject
+
+@end

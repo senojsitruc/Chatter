@@ -1,0 +1,258 @@
+//
+//  CZSpan.m
+//  ScriptSync
+//
+//  Created by Curtis Jones on 2010.12.09.
+//  Copyright 2010 Nexidia, Inc. All rights reserved.
+//
+
+#import "CZSpan.h"
+#import "CZSpan+DBObject.h"
+#import "CZDocument+DBObject.h"
+#import "CZTake+DBObject.h"
+#import "DBObject.h"
+#import "DBConnection.h"
+#import "DBResult.h"
+#import "DBStatement.h"
+#import "Easy.h"
+
+@interface CZSpan (PrivateMethods)
+- (CZSpan *)__dbobjectHandleResult:(DBResult *)result;
+@end
+
+@implementation CZSpan (DBObject)
+
+/**
+ *
+ *
+ */
++ (NSArray *)dbobjectSelectAllForDocument:(CZDocument *)document
+{
+	BOOL retval = TRUE;
+	DBConnection *connection = nil;
+	DBResult *result = nil;
+	DBStatement *statement = nil;
+	CZSpan *object = nil;
+	NSMutableArray *objects = [NSMutableArray array];
+	
+	// from the document to the db connection
+	if (nil == (connection = document.dbconnection))
+		@throw [NSException exceptionWithName:CZExceptionNoDbConnection reason:@"No connection associated with this document." userInfo:nil];
+	
+	// get the prepared statement for this operation
+	if (nil == (statement = [connection statementForName:@"span_select_all"]))
+		@throw [NSException exceptionWithName:CZExceptionNoStatement reason:@"Could not find the required statement" userInfo:nil];
+	
+	// execute statement
+	if (![connection exec:statement result:&result])
+		CZ_DBOBJ_ERROR(statement,retval,done);
+	
+	// handle result
+	CZ_DBOBJ_HANDLE([CZSpan span], @selector(__addCachedSpan:));
+	
+done:
+	[statement clear];
+	return objects;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)dbobjectInsert
+{
+	BOOL retval = TRUE;
+	DBConnection *connection = nil;
+	DBResult *result = nil;
+	DBStatement *statement = nil;
+	NSUInteger databaseId;
+	
+	// from the document to the db connection
+	if (nil == (connection = self.document.dbconnection))
+		@throw [NSException exceptionWithName:CZExceptionNoDbConnection reason:@"No connection associated with this document." userInfo:nil];
+	
+	// get the prepared statement for this operation
+	if (nil == (statement = [connection statementForName:@"span_insert"]))
+		@throw [NSException exceptionWithName:CZExceptionNoStatement reason:@"Could not find the required statement" userInfo:nil];
+	
+	// if this object already has a database key then don't insert it again
+	if (mDatabaseId != 0)
+		@throw [NSException exceptionWithName:CZExceptionIllegalOperation reason:@"Can not insert an already inserted object" userInfo:nil];
+	
+	if (mTakeId == 0)
+		mTakeId = mTake.databaseId;
+	
+	// setup
+	{
+		[statement bindUint32:mTakeId atIndex:1];
+		[statement bindUint32:mBeg atIndex:2];
+		[statement bindUint32:mEnd atIndex:3];
+		[statement bindUint32:mColor atIndex:4];
+		[statement bindUint32:mStyle atIndex:5];
+	}
+	
+	// execute statement
+	if (![connection exec:statement result:&result])
+		CZ_DBOBJ_ERROR(statement,retval,done);
+	
+	// get primary key
+	if (TRUE == [connection lastInsertRowId:&databaseId]) {
+		self.databaseId = databaseId;
+		[self.document __addCachedSpan:(CZSpan *)[self dbobjectCopy]];
+	}
+	else
+		NSLog(@"%s.. failed to lastInsertRowId()", __PRETTY_FUNCTION__);
+	
+done:
+	[statement clear];
+	return retval;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)dbobjectUpdate
+{
+	BOOL retval = TRUE;
+	DBConnection *connection = nil;
+	DBResult *result = nil;
+	DBStatement *statement = nil;
+	
+	if ([[self.document __getCachedSpanForSpan:self] dbobjectCompare:self] == DBObjectComparisonEquals)
+		return TRUE;
+	
+	// from the document to the db connection
+	if (nil == (connection = self.document.dbconnection))
+		@throw [NSException exceptionWithName:CZExceptionNoDbConnection reason:@"No connection associated with this document." userInfo:nil];
+	
+	// get the prepared statement for this operation
+	if (nil == (statement = [connection statementForName:@"span_update_by_id"]))
+		@throw [NSException exceptionWithName:CZExceptionNoStatement reason:@"Could not find the required statement" userInfo:nil];
+	
+	// the record must already have been inserted before we can attempt to update it
+	if (mDatabaseId == 0)
+		@throw [NSException exceptionWithName:CZExceptionIllegalOperation reason:@"Can not update a record that hasn't yet been inserted" userInfo:nil];
+	
+	if (mTakeId == 0)
+		mTakeId = mTake.databaseId;
+	
+	// setup
+	{
+		[statement bindUint32:mTakeId atIndex:1];
+		[statement bindUint32:mBeg atIndex:2];
+		[statement bindUint32:mEnd atIndex:3];
+		[statement bindUint32:mColor atIndex:4];
+		[statement bindUint32:mStyle atIndex:5];
+		[statement bindUint32:mDatabaseId atIndex:6];
+	}
+	
+	// execute statement
+	if (![connection exec:statement result:&result])
+		CZ_DBOBJ_ERROR(statement,retval,done);
+	
+	[self.document __addCachedSpan:(CZSpan *)[self dbobjectCopy]];
+	
+done:
+	[statement clear];
+	return retval;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)dbobjectDelete
+{
+	BOOL retval = TRUE;
+	DBConnection *connection = nil;
+	DBResult *result = nil;
+	DBStatement *statement = nil;
+	
+	// from the document to the db connection
+	if (nil == (connection = self.document.dbconnection))
+		@throw [NSException exceptionWithName:CZExceptionNoDbConnection reason:@"No connection associated with this document." userInfo:nil];
+	
+	// get the prepared statement for this operation
+	if (nil == (statement = [connection statementForName:@"span_delete_by_id"]))
+		@throw [NSException exceptionWithName:CZExceptionNoStatement reason:@"Could not find the required statement" userInfo:nil];
+	
+	// the record must already have been inserted before we can attempt to delete it
+	if (mDatabaseId == 0)
+		@throw [NSException exceptionWithName:CZExceptionIllegalOperation reason:@"Can not delete a record that hasn't yet been inserted" userInfo:nil];
+	
+	// setup
+	[statement bindUint32:mDatabaseId atIndex:1];
+	
+	// execute statement
+	if (![connection exec:statement result:&result])
+		CZ_DBOBJ_ERROR(statement,retval,done);
+	
+	[[self retain] autorelease];
+	[self.document __removeSpan:self];
+	[self.document __removeCachedSpan:self];
+	
+done:
+	[statement clear];
+	return retval;
+}
+
+/**
+ *
+ *
+ */
+- (DBObjectComparisonResult)dbobjectCompare:(id<DBObject>)anObject
+{
+	CZSpan *span = (CZSpan *)anObject;
+	
+	if (span->mBeg == mBeg &&
+			span->mEnd == mEnd &&
+			span->mColor == mColor &&
+			span->mStyle == mStyle &&
+			span->mTakeId == mTakeId)
+		return DBObjectComparisonEquals;
+	else
+		return DBObjectComparisonNotEquals;
+}
+
+/**
+ *
+ *
+ */
+- (id<DBObject>)dbobjectCopy
+{
+	CZSpan *span = [self copy];
+	
+	span->mBeg = mBeg;
+	span->mEnd = mEnd;
+	span->mColor = mColor;
+	span->mStyle = mStyle;
+	span->mTakeId = mTakeId;
+	
+	return span;
+}
+
+
+
+
+
+#pragma mark -
+#pragma mark Private
+
+/**
+ *
+ *
+ */
+- (CZSpan *)__dbobjectHandleResult:(DBResult *)result
+{
+	[result getUint32:&mDatabaseId atColumn:0];
+	[result getUint32:&mTakeId atColumn:1];
+	[result getUint32:&mBeg atColumn:2];
+	[result getUint32:&mEnd atColumn:3];
+	[result getUint32:&mColor atColumn:4];
+	[result getUint32:&mStyle atColumn:5];
+	
+	return self;
+}
+
+@end

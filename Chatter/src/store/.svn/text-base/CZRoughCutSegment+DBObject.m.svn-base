@@ -1,0 +1,256 @@
+//
+//  CZRoughCutSegment.m
+//  ScriptSync
+//
+//  Created by Curtis Jones on 2010.11.30.
+//  Copyright 2010 Nexidia, Inc. All rights reserved.
+//
+
+#import "CZRoughCutSegment+DBObject.h"
+#import "CZRoughCut+DBObject.h"
+#import "CZDocument+DBObject.h"
+#import "CZMedia+DBObject.h"
+#import "DBConnection.h"
+#import "DBResult.h"
+#import "DBStatement.h"
+#import "Easy.h"
+
+@interface CZRoughCutSegment (DBObjectPrivate)
+- (CZRoughCutSegment *)__dbobjectHandleResult:(DBResult *)result;
+@end
+
+@implementation CZRoughCutSegment (DBObject)
+
+/**
+ *
+ *
+ */
++ (NSArray *)dbobjectSelectAllForDocument:(CZDocument *)document
+{
+	BOOL retval = TRUE;
+	DBConnection *connection = nil;
+	DBResult *result = nil;
+	DBStatement *statement = nil;
+	CZRoughCutSegment *object = nil;
+	NSMutableArray *objects = [NSMutableArray array];
+	
+	// from the document to the db connection
+	if (nil == (connection = document.dbconnection))
+		@throw [NSException exceptionWithName:CZExceptionNoDbConnection reason:@"No connection associated with this document." userInfo:nil];
+	
+	// get the prepared statement for this operation
+	if (nil == (statement = [connection statementForName:@"roughcutsegment_select_all"]))
+		@throw [NSException exceptionWithName:CZExceptionNoStatement reason:@"Could not find the required statement" userInfo:nil];
+	
+	// execute statement
+	if (![connection exec:statement result:&result])
+		CZ_DBOBJ_ERROR(statement,retval,done);
+	
+	// handle result
+	CZ_DBOBJ_HANDLE([CZRoughCutSegment roughCutSegment], @selector(__addCachedRoughCutSegment:));
+	
+done:
+	[statement clear];
+	return objects;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)dbobjectInsert
+{
+	BOOL retval = TRUE;
+	DBConnection *connection = nil;
+	DBResult *result = nil;
+	DBStatement *statement = nil;
+	NSUInteger databaseId;
+	
+	// from the document to the db connection
+	if (nil == (connection = self.document.dbconnection))
+		@throw [NSException exceptionWithName:CZExceptionNoDbConnection reason:@"No connection associated with this roughcut segment." userInfo:nil];
+	
+	// get the prepared statement for this operation
+	if (nil == (statement = [connection statementForName:@"roughcutsegment_insert"]))
+		@throw [NSException exceptionWithName:CZExceptionNoStatement reason:@"Could not find the required statement" userInfo:nil];
+	
+	// if this object already has a database key then don't insert it again
+	if (mDatabaseId != 0)
+		@throw [NSException exceptionWithName:CZExceptionIllegalOperation reason:@"Can not insert an already inserted object" userInfo:nil];
+	
+	if (mRoughCutId == 0)
+		mRoughCutId = mRoughCut.databaseId;
+	
+	if (mMediaId == 0)
+		mMediaId = mMedia.databaseId;
+	
+	// setup
+	{
+		[statement bindUint32:mRoughCutId atIndex:1];
+		[statement bindUint32:mMediaId atIndex:2];
+		[statement bindUint32:mIndex atIndex:3];
+		[statement bindBlob:mElementData atIndex:4];
+	}
+	
+	// execute statement
+	if (![connection exec:statement result:&result])
+		CZ_DBOBJ_ERROR(statement,retval,done);
+	
+	// get primary key
+	if (TRUE == [connection lastInsertRowId:&databaseId]) {
+		self.databaseId = databaseId;
+		[self.document __addCachedRoughCutSegment:(CZRoughCutSegment *)[self dbobjectCopy]];
+	}
+	else
+		NSLog(@"%s.. failed to lastInsertRowId()", __PRETTY_FUNCTION__);
+	
+done:
+	[statement clear];
+	return retval;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)dbobjectUpdate
+{
+	BOOL retval = TRUE;
+	DBConnection *connection = nil;
+	DBResult *result = nil;
+	DBStatement *statement = nil;
+	
+	if ([[self.document __getCachedRoughCutSegmentForRoughCutSegment:self] dbobjectCompare:self] == DBObjectComparisonEquals)
+		return TRUE;
+	
+	// from the document to the db connection
+	if (nil == (connection = self.document.dbconnection))
+		@throw [NSException exceptionWithName:CZExceptionNoDbConnection reason:@"No connection associated with this roughcut segment." userInfo:nil];
+	
+	// get the prepared statement for this operation
+	if (nil == (statement = [connection statementForName:@"roughcutsegment_update_by_id"]))
+		@throw [NSException exceptionWithName:CZExceptionNoStatement reason:@"Could not find the required statement" userInfo:nil];
+	
+	// the record must already have been inserted before we can attempt to update it
+	if (mRoughCutId == 0)
+		@throw [NSException exceptionWithName:CZExceptionIllegalOperation reason:@"Can not update a record that hasn't yet been inserted" userInfo:nil];
+	
+	if (mRoughCutId == 0)
+		mRoughCutId = mRoughCut.databaseId;
+	
+	if (mMediaId == 0)
+		mMediaId = mMedia.databaseId;
+	
+	// setup
+	{
+		[statement bindUint32:mRoughCutId atIndex:1];
+		[statement bindUint32:mMediaId atIndex:2];
+		[statement bindUint32:mIndex atIndex:3];
+		[statement bindBlob:mElementData atIndex:4];
+		[statement bindUint32:mDatabaseId atIndex:5];
+	}
+	
+	// execute statement
+	if (![connection exec:statement result:&result])
+		CZ_DBOBJ_ERROR(statement,retval,done);
+	
+	[self.document __addCachedRoughCutSegment:(CZRoughCutSegment *)[self dbobjectCopy]];
+	
+done:
+	[statement clear];
+	return retval;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)dbobjectDelete
+{
+	BOOL retval = TRUE;
+	DBConnection *connection = nil;
+	DBResult *result = nil;
+	DBStatement *statement = nil;
+	
+	// from the document to the db connection
+	if (nil == (connection = self.document.dbconnection))
+		@throw [NSException exceptionWithName:CZExceptionNoDbConnection reason:@"No connection associated with this roughcut segment." userInfo:nil];
+	
+	// get the prepared statement for this operation
+	if (nil == (statement = [connection statementForName:@"roughcutsegment_delete_by_id"]))
+		@throw [NSException exceptionWithName:CZExceptionNoStatement reason:@"Could not find the required statement" userInfo:nil];
+	
+	// the record must already have been inserted before we can attempt to delete it
+	if (mDatabaseId == 0)
+		@throw [NSException exceptionWithName:CZExceptionIllegalOperation reason:@"Can not delete a record that hasn't yet been inserted" userInfo:nil];
+	
+	// setup
+	[statement bindUint32:mDatabaseId atIndex:1];
+	
+	// execute statement
+	if (![connection exec:statement result:&result])
+		CZ_DBOBJ_ERROR(statement,retval,done);
+	
+	[[self retain] autorelease];
+	[self.document __removeRoughCutSegment:self];
+	[self.document __removeCachedRoughCutSegment:self];
+	
+done:
+	[statement clear];
+	return retval;
+}
+
+/**
+ *
+ *
+ */
+- (DBObjectComparisonResult)dbobjectCompare:(id<DBObject>)anObject
+{
+	CZRoughCutSegment *segment = (CZRoughCutSegment *)anObject;
+	
+	if (segment->mRoughCutId == mRoughCutId &&
+			segment->mMediaId == mMediaId &&
+			segment->mIndex == mIndex)
+		return DBObjectComparisonEquals;
+	else
+		return DBObjectComparisonNotEquals;
+}
+
+/**
+ *
+ *
+ */
+- (id<DBObject>)dbobjectCopy
+{
+	CZRoughCutSegment *segment = [self copy];
+	
+	segment->mRoughCutId = mRoughCutId;
+	segment->mMediaId = mMediaId;
+	segment->mIndex = mIndex;
+	
+	return segment;
+}
+
+
+
+
+
+#pragma mark -
+#pragma mark Private
+
+/**
+ *
+ *
+ */
+- (CZRoughCutSegment *)__dbobjectHandleResult:(DBResult *)result
+{
+	[result getUint32:&mDatabaseId atColumn:0];
+	[result getUint32:&mRoughCutId atColumn:1];
+	[result getUint32:&mMediaId atColumn:2];
+	[result getUint32:&mIndex atColumn:3];
+	[result getBlob:&mElementData atColumn:4];
+	
+	return self;
+}
+
+@end

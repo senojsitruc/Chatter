@@ -1,0 +1,280 @@
+//
+//  CZScriptStyle.m
+//  ScriptSync
+//
+//  Created by Curtis Jones on 2010.12.01.
+//  Copyright 2010 Nexidia, Inc. All rights reserved.
+//
+
+#import "CZScriptStyle+DBObject.h"
+#import "CZDocument+DBObject.h"
+#import "CZParagraphStyle+DBObject.h"
+#import "DBObject.h"
+#import "DBConnection.h"
+#import "DBResult.h"
+#import "DBStatement.h"
+#import "Easy.h"
+
+@interface CZScriptStyle (PrivateMethods)
+- (CZScriptStyle *)__dbobjectHandleResult:(DBResult *)result;
+@end
+
+@implementation CZScriptStyle (DBObject)
+
+/**
+ *
+ *
+ */
++ (NSArray *)dbobjectSelectAllForDocument:(CZDocument *)document
+{
+	BOOL retval = TRUE;
+	DBConnection *connection = nil;
+	DBResult *result = nil;
+	DBStatement *statement = nil;
+	CZScriptStyle *object = nil;
+	NSMutableArray *objects = [NSMutableArray array];
+	
+	// from the document to the db connection
+	if (nil == (connection = document.dbconnection))
+		@throw [NSException exceptionWithName:CZExceptionNoDbConnection reason:@"No connection associated with this document." userInfo:nil];
+	
+	// get the prepared statement for this operation
+	if (nil == (statement = [connection statementForName:@"scriptstyle_select_all"]))
+		@throw [NSException exceptionWithName:CZExceptionNoStatement reason:@"Could not find the required statement" userInfo:nil];
+	
+	// execute statement
+	if (![connection exec:statement result:&result])
+		CZ_DBOBJ_ERROR(statement,retval,done);
+	
+	// handle result
+	CZ_DBOBJ_HANDLE([CZScriptStyle scriptStyle], @selector(__addCachedScriptStyle:));
+	
+done:
+	[statement clear];
+	return objects;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)dbobjectInsert
+{
+	BOOL retval = TRUE;
+	DBConnection *connection = nil;
+	DBResult *result = nil;
+	DBStatement *statement = nil;
+	NSUInteger databaseId;
+	
+	// from the document to the db connection
+	if (nil == (connection = self.document.dbconnection))
+		@throw [NSException exceptionWithName:CZExceptionNoDbConnection reason:@"No connection associated with this document." userInfo:nil];
+	
+	// get the prepared statement for this operation
+	if (nil == (statement = [connection statementForName:@"scriptstyle_insert"]))
+		@throw [NSException exceptionWithName:CZExceptionNoStatement reason:@"Could not find the required statement" userInfo:nil];
+	
+	// if this object already has a database key then don't insert it again
+	if (mDatabaseId != 0)
+		@throw [NSException exceptionWithName:CZExceptionIllegalOperation reason:@"Can not insert an already inserted object" userInfo:nil];
+	
+	// setup
+	{
+		[statement bindString:mName atIndex:1];
+		[statement bindUint32:mSceneStyleId atIndex:2];
+		[statement bindUint32:mCharacterStyleId atIndex:3];
+		[statement bindUint32:mActionStyleId atIndex:4];
+		[statement bindUint32:mDialogStyleId atIndex:5];
+		[statement bindUint32:mParentheticalStyleId atIndex:6];
+		[statement bindUint32:mTransitionStyleId atIndex:7];
+	}
+	
+	// execute statement
+	if (![connection exec:statement result:&result])
+		CZ_DBOBJ_ERROR(statement,retval,done);
+	
+	// get primary key
+	if (TRUE == [connection lastInsertRowId:&databaseId]) {
+		self.databaseId = databaseId;
+		[self.document __addCachedScriptStyle:(CZScriptStyle *)[self dbobjectCopy]];
+	}
+	else
+		NSLog(@"%s.. failed to lastInsertRowId()", __PRETTY_FUNCTION__);
+	
+done:
+	[statement clear];
+	return retval;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)dbobjectUpdate
+{
+	BOOL retval = TRUE;
+	DBConnection *connection = nil;
+	DBResult *result = nil;
+	DBStatement *statement = nil;
+	
+	if ([[self.document __getCachedScriptStyleForScriptStyle:self] dbobjectCompare:self] == DBObjectComparisonEquals)
+		return TRUE;
+	
+	// from the document to the db connection
+	if (nil == (connection = self.document.dbconnection))
+		@throw [NSException exceptionWithName:CZExceptionNoDbConnection reason:@"No connection associated with this document." userInfo:nil];
+	
+	// get the prepared statement for this operation
+	if (nil == (statement = [connection statementForName:@"scriptstyle_update_by_id"]))
+		@throw [NSException exceptionWithName:CZExceptionNoStatement reason:@"Could not find the required statement" userInfo:nil];
+	
+	// the record must already have been inserted before we can attempt to update it
+	if (mDatabaseId == 0)
+		@throw [NSException exceptionWithName:CZExceptionIllegalOperation reason:@"Can not update a record that hasn't yet been inserted" userInfo:nil];
+	
+	if (mSceneStyleId == 0)
+		mSceneStyleId = mScene.databaseId;
+	
+	if (mCharacterStyleId == 0)
+		mCharacterStyleId = mCharacter.databaseId;
+	
+	if (mActionStyleId == 0)
+		mActionStyleId = mAction.databaseId;
+	
+	if (mDialogStyleId == 0)
+		mDialogStyleId = mDialog.databaseId;
+	
+	if (mParentheticalStyleId == 0)
+		mParentheticalStyleId = mParenthetical.databaseId;
+	
+	if (mTransitionStyleId == 0)
+		mTransitionStyleId == mTransition.databaseId;
+	
+	// setup
+	{
+		[statement bindString:mName atIndex:1];
+		[statement bindUint32:mSceneStyleId atIndex:2];
+		[statement bindUint32:mCharacterStyleId atIndex:3];
+		[statement bindUint32:mActionStyleId atIndex:4];
+		[statement bindUint32:mDialogStyleId atIndex:5];
+		[statement bindUint32:mParentheticalStyleId atIndex:6];
+		[statement bindUint32:mTransitionStyleId atIndex:7];
+		[statement bindUint32:mDatabaseId atIndex:8];
+	}
+	
+	// execute statement
+	if (![connection exec:statement result:&result])
+		CZ_DBOBJ_ERROR(statement,retval,done);
+	
+	[self.document __addCachedScriptStyle:(CZScriptStyle *)[self dbobjectCopy]];
+	
+done:
+	[statement clear];
+	return retval;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)dbobjectDelete
+{
+	BOOL retval = TRUE;
+	DBConnection *connection = nil;
+	DBResult *result = nil;
+	DBStatement *statement = nil;
+	
+	// from the document to the db connection
+	if (nil == (connection = self.document.dbconnection))
+		@throw [NSException exceptionWithName:CZExceptionNoDbConnection reason:@"No connection associated with this document." userInfo:nil];
+	
+	// get the prepared statement for this operation
+	if (nil == (statement = [connection statementForName:@"scriptstyle_delete_by_id"]))
+		@throw [NSException exceptionWithName:CZExceptionNoStatement reason:@"Could not find the required statement" userInfo:nil];
+	
+	// the record must already have been inserted before we can attempt to delete it
+	if (mDatabaseId == 0)
+		@throw [NSException exceptionWithName:CZExceptionIllegalOperation reason:@"Can not delete a record that hasn't yet been inserted" userInfo:nil];
+	
+	// setup
+	[statement bindUint32:mDatabaseId atIndex:1];
+	
+	// execute statement
+	if (![connection exec:statement result:&result])
+		CZ_DBOBJ_ERROR(statement,retval,done);
+	
+	[[self retain] autorelease];
+	[self.document __removeScriptStyle:self];
+	[self.document __removeCachedScriptStyle:self];
+	
+done:
+	[statement clear];
+	return retval;
+}
+
+/**
+ *
+ *
+ */
+- (DBObjectComparisonResult)dbobjectCompare:(id<DBObject>)anObject
+{
+	CZScriptStyle *scriptStyle = (CZScriptStyle *)anObject;
+	
+	if (scriptStyle->mName == mName &&
+			scriptStyle->mSceneStyleId == mSceneStyleId &&
+			scriptStyle->mCharacterStyleId == mCharacterStyleId &&
+			scriptStyle->mActionStyleId == mActionStyleId &&
+			scriptStyle->mDialogStyleId == mDialogStyleId &&
+			scriptStyle->mParentheticalStyleId == mParentheticalStyleId &&
+			scriptStyle->mTransitionStyleId == mTransitionStyleId)
+		return DBObjectComparisonEquals;
+	else
+		return DBObjectComparisonNotEquals;
+}
+
+/**
+ *
+ *
+ */
+- (id<DBObject>)dbobjectCopy
+{
+	CZScriptStyle *scriptStyle = [self copy];
+	
+	scriptStyle->mName = [mName retain];
+	scriptStyle->mParenthetical = [mParenthetical retain];
+	scriptStyle->mSceneStyleId = mSceneStyleId;
+	scriptStyle->mCharacterStyleId = mCharacterStyleId;
+	scriptStyle->mActionStyleId = mActionStyleId;
+	scriptStyle->mDialogStyleId = mDialogStyleId;
+	scriptStyle->mParentheticalStyleId = mParentheticalStyleId;
+	scriptStyle->mTransitionStyleId = mTransitionStyleId;
+	
+	return scriptStyle;
+}
+
+
+
+
+
+#pragma mark -
+#pragma mark Private
+
+/**
+ *
+ *
+ */
+- (CZScriptStyle *)__dbobjectHandleResult:(DBResult *)result
+{
+	[result getUint32:&mDatabaseId atColumn:0];
+	[result getString:&mName atColumn:1];
+	[result getUint32:&mSceneStyleId atColumn:2];
+	[result getUint32:&mCharacterStyleId atColumn:3];
+	[result getUint32:&mActionStyleId atColumn:4];
+	[result getUint32:&mDialogStyleId atColumn:5];
+	[result getUint32:&mParentheticalStyleId atColumn:6];
+	[result getUint32:&mTransitionStyleId atColumn:7];
+	
+	return self;
+}
+
+@end

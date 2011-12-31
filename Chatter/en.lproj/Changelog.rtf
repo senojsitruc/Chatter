@@ -1,0 +1,105 @@
+{\rtf1\ansi\ansicpg1252\cocoartf1138
+{\fonttbl\f0\fnil\fcharset0 Inconsolata;}
+{\colortbl;\red255\green255\blue255;}
+\vieww9000\viewh8400\viewkind0
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\pardirnatural
+
+\f0\fs18 \cf0 [RELEASE 1.0.0 "Alabama"] - 2011.07.01\
+\
+	Initial release.\
+\
+	About\
+		Added a custom "About" panel and text giving credit and thanks.\
+		Added support for viewing the changelog in the about panel.\
+\
+	Buddies\
+		Added support for displaying the buddy list. Buddies are always sorted alphabetically.\
+		Added support for randomly assigning a user icon to each account (in lieu of AB support).\
+		Added support for storing address book uid references for a person record.\
+		Added support for assigning names to buddies.\
+		Added support for switching between a screen-name list view and a real-name list view.\
+		Added support for deleting a person or buddy via a contextual menu.\
+		Added support for assigning (via drag-and-drop) an image to a buddy.\
+		Added support for assigning (via drag-and-drop) an image to a person (which overrides the \
+			image for the buddy).\
+		Added support for saving user-defined buddy/person profile images to disk.\
+		Added support for indicating the number of buddies/people available in the buddy list header.\
+		Added support for a unified buddy list that combined people and accounts. Accounts that have\
+			a person association are hidden and now only show up in a table when one edits the\
+			person.\
+\
+	Conversations\
+		Added support for viewing the messages of a source (ie, a conversation) in a separate window.\
+		Added support schema support for storing a binary alias representation of the chat log's file \
+			path which will allow us to find the chat log even if it is moved or renamed.\
+		Added support for automatically re-opening conversations that were open when we last quit.\
+		Added support for jumping to the target message when opening a conversation.\
+\
+	Database\
+		Added support for storing and retrieving data (messages, chats, buddies, etc.) via SQLite.\
+		Added support for upgrading the schema of the database if the current database is out-of-date.\
+		Added support for verifying that the database schema is up-to-date and not too new either.\
+		Added support for grouping messages as conversations apart from the message's source file.\
+			This was necessary to support icq and skype, which do not store conversations in \
+			individual files; instead they use a single large database for all chat history.\
+\
+	Import\
+		Added support for importing iChat log files.\
+		Added support for importing Adium log files.\
+		Added support for pre-scanning files-to-import so that we can provide a finite progress indicator.\
+		Added support for searching the address book during import to automatically create (if necessary)\
+			and assign "person" records to new account records based on email and IM matches.\
+		Added support for importing Trillian log files.\
+		Added support for importing AIM xml and html log files.\
+		Added support for skipping duplicates when re-importing a chat log that may contain changes.\
+		Added support for importing Colloquy IRC log files.\
+		Added support for choosing a particular importer in the open panel, which forces the use of that\
+			importer for all selected files instead of automatically detecting the appropriate importer.\
+		Added support for the "magical" import process, which employs Spotlight to find supported chat\
+			log files on the existing system.\
+		Added support for importing InstantBird (ie, libPurple) plain text and html log files.\
+		Added support for an importer plugin api. Removed all of the compiled-in importer code and created\
+			individual plugins for each importer.\
+		Added support for importing Skype log files. This was made possible by Neal Krawetz's skypelog.\
+		Added support for populating the importer list in the open panel based on the available plugins.\
+		Added support for word stemming (http://tartarus.org/~martin/PorterStemmer).\
+\
+	Loading\
+		When loading the database, do a record count first, and show a definite progress indicator.\
+\
+	Messages\
+		Added support for displaying a message set. Messages are always sorted chronologically.\
+		Added support for very plain CoreGraphics-based message bubbles.\
+		Added support for borders, shadows and horizontal dividers in message bubbles.\
+		Added support for live resizing which recalculates message text height on the fly.\
+		Added support for handling large lists by expanding the table size as necessary while scrolling.\
+		Added support for opening a conversation window via a contextual menu in a message.\
+		Added support for revealing the source file in the Finder via a contextual menu in a message.\
+		Added support for assigning random message bubble colors to each participant in a message set.\
+\
+	Other\
+		Added support for application sandboxing.\
+		Added support for sending a feedback email which includes Chatter and system version info.\
+		Added support for displaying buddy, chat, message and distinct word count in a status bar.\
+\
+	Preferences\
+		Added support for a tabbed, re-sizing preference pane accessible from the main toolbar.\
+\
+	Search, Group, Filter\
+		Added support for searching message text by a list of word.\
+		Added support for filtering the displayed messages by the buddy selection.\
+		Added support for coordinating searches and filters to always display the subset of the two.\
+		Added support for grouping messages by conversation along with a group row indicating the\
+			start date/time of the conversation and the names of the participants. Conversation\
+			grouping can be used in conjunction with searching and filtering.\
+		Added support for grouping messages by person along with a group row indicating the name\
+			of the person associated with the message group. Person grouping can be used in con-\
+			junction with searching and filtering.\
+		Added support for sorting ascending/descending by date when grouping messages by conversation.\
+		Added support for multi-line, character-wrapped group headers in the main message table.\
+		Added support for sorting ascending/descending by name when grouping messages by person.\
+		Added support for performing sorting and grouping of messages on a background thread.\
+\
+	Update\
+		Added support for checking for a newer version, manually, based on a user click.\
+}

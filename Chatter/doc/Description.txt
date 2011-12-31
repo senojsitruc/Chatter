@@ -1,0 +1,13 @@
+Free for a limited time. Get it now! Based on feedback from early users, I intend to incorporate the
+features that are most sought after, and eventually start charging for Chatter.
+
+Chatter will import and index all of your chat logs (handling hundreds of thousands with easy), 
+making them accessible and searchable to you. The intuitive interface lets you find the information 
+you're looking for quickly and easily.
+
+The first step is to import your existing iChat, Adium or Trillian chat logs, which is as easy as 
+selecting a directory. Moments later, you can filter the displayed data set by selecting names from 
+the buddy list or search for messages containing any set of words.
+
+Updating is as easy as the original import, and you don't have to worry about duplicate messages
+because Chatter will only import each message once.

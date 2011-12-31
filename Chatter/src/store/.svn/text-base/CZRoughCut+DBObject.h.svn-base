@@ -1,0 +1,22 @@
+//
+//  CZRoughCut.h
+//  ScriptSync
+//
+//  Created by Curtis Jones on 2010.11.30.
+//  Copyright 2010 Nexidia, Inc. All rights reserved.
+//
+
+#import <Cocoa/Cocoa.h>
+#import "CZRoughCut.h"
+#import "DBObject.h"
+
+@class CZDocument;
+
+@interface CZRoughCut (DBObject) <DBObject>
+
+/**
+ *
+ */
++ (NSArray *)dbobjectSelectAllForDocument:(CZDocument *)document;
+
+@end

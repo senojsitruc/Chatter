@@ -1,0 +1,282 @@
+//
+//  CZTake+DBObject.m
+//  ScriptSync
+//
+//  Created by Curtis Jones on 2010.10.08.
+//  Copyright 2010 Nexidia, Inc. All rights reserved.
+//
+
+#import "CZTake+DBObject.h"
+#import "CZDocument+DBObject.h"
+#import "CZSlate+DBObject.h"
+#import "CZScript+DBObject.h"
+#import "CZMedia.h"
+#import "DBObject.h"
+#import "DBConnection.h"
+#import "DBResult.h"
+#import "DBStatement.h"
+#import "Easy.h"
+
+@interface CZTake (DBObjectPrivate)
+- (CZTake *)__dbobjectHandleResult:(DBResult *)result;
+@end
+
+@implementation CZTake (DBObject)
+
+/**
+ *
+ *
+ */
++ (NSArray *)dbobjectSelectAllForDocument:(CZDocument *)document
+{
+	BOOL retval = TRUE;
+	DBConnection *connection = nil;
+	DBResult *result = nil;
+	DBStatement *statement = nil;
+	CZTake *object = nil;
+	NSMutableArray *objects = [NSMutableArray array];
+	
+	// from the script to the document to the db connection
+	if (nil == (connection = document.dbconnection))
+		@throw [NSException exceptionWithName:CZExceptionNoDbConnection reason:@"No connection associated with this script." userInfo:nil];
+	
+	// get the prepared statement for this operation
+	if (nil == (statement = [connection statementForName:@"take_select_all"]))
+		@throw [NSException exceptionWithName:CZExceptionNoStatement reason:@"Could not find the required statement" userInfo:nil];
+	
+	// execute statement
+	if (![connection exec:statement result:&result])
+		CZ_DBOBJ_ERROR(statement,retval,done);
+	
+	// handle result
+	CZ_DBOBJ_HANDLE([CZTake take], @selector(__addCachedTake:));
+	
+done:
+	[statement clear];
+	return objects;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)dbobjectInsert
+{
+	BOOL retval = TRUE;
+	DBConnection *connection = nil;
+	DBResult *result = nil;
+	DBStatement *statement = nil;
+	NSUInteger databaseId;
+	
+	// from the script to the document to the db connection
+	if (nil == (connection = self.document.dbconnection))
+		@throw [NSException exceptionWithName:CZExceptionNoDbConnection reason:@"No connection associated with this take." userInfo:nil];
+	
+	// get the prepared statement for this operation
+	if (nil == (statement = [connection statementForName:@"take_insert"]))
+		@throw [NSException exceptionWithName:CZExceptionNoStatement reason:@"Could not find the required statement" userInfo:nil];
+	
+	// if this object already has a database key then don't insert it again
+	if (mDatabaseId != 0)
+		@throw [NSException exceptionWithName:CZExceptionIllegalOperation reason:@"Cannot insert an already inserted object" userInfo:nil];
+	
+	if (mSlateId == 0)
+		mSlateId = mSlate.databaseId;
+	
+	if (mMediaId == 0)
+		mMediaId = mMedia.databaseId;
+	
+	// setup
+	{
+		[statement bindUint32:mSlateId atIndex:1];
+		[statement bindUint32:mMediaId atIndex:2];
+		[statement bindString:mName atIndex:3];
+		[statement bindString:mLabel atIndex:4];
+		[statement bindUint32:mPosition atIndex:5];
+		[statement bindUint32:mHidden atIndex:6];
+		[statement bindUint32:mSuggested atIndex:7];
+	}
+	
+	// execute statement
+	if (![connection exec:statement result:&result])
+		CZ_DBOBJ_ERROR(statement,retval,done);
+	
+	// get primary key
+	if (TRUE == [connection lastInsertRowId:&databaseId]) {
+		self.databaseId = databaseId;
+		[self.document __addCachedTake:(CZTake *)[self dbobjectCopy]];
+	}
+	else
+		NSLog(@"%s.. failed to lastInsertRowId()", __PRETTY_FUNCTION__);
+	
+done:
+	[statement clear];
+	return retval;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)dbobjectUpdate
+{
+	BOOL retval = TRUE;
+	DBConnection *connection = nil;
+	DBResult *result = nil;
+	DBStatement *statement = nil;
+	
+	if ([[self.document __getCachedTakeForTake:self] dbobjectCompare:self] == DBObjectComparisonEquals)
+		return TRUE;
+	
+	// from the script to the document to the db connection
+	if (nil == (connection = self.document.dbconnection))
+		@throw [NSException exceptionWithName:CZExceptionNoDbConnection reason:@"No connection associated with this take." userInfo:nil];
+	
+	// get the prepared statement for this operation
+	if (nil == (statement = [connection statementForName:@"take_update_by_id"]))
+		@throw [NSException exceptionWithName:CZExceptionNoStatement reason:@"Could not find the required statement" userInfo:nil];
+	
+	// the record must already have been inserted before we can attempt to update it
+	if (mDatabaseId == 0)
+		@throw [NSException exceptionWithName:CZExceptionIllegalOperation reason:@"Can not update a record that hasn't yet been inserted" userInfo:nil];
+	
+	if (mSlateId == 0)
+		mSlateId = mSlate.databaseId;
+	
+	if (mMediaId == 0)
+		mMediaId = mMedia.databaseId;
+	
+	// setup
+	{
+		[statement bindUint32:mSlateId atIndex:1];
+		[statement bindUint32:mMediaId atIndex:2];
+		[statement bindString:mName atIndex:3];
+		[statement bindString:mLabel atIndex:4];
+		[statement bindUint32:mPosition atIndex:5];
+		[statement bindUint32:mHidden atIndex:6];
+		[statement bindUint32:mSuggested atIndex:7];
+		[statement bindUint32:mDatabaseId atIndex:8];
+	}
+	
+	// execute statement
+	if (![connection exec:statement result:&result])
+		CZ_DBOBJ_ERROR(statement,retval,done);
+	
+	[self.document __addCachedTake:(CZTake *)[self dbobjectCopy]];
+	
+done:
+	[statement clear];
+	return retval;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)dbobjectDelete
+{
+	BOOL retval = TRUE;
+	DBConnection *connection = nil;
+	DBResult *result = nil;
+	DBStatement *statement = nil;
+	
+	// from the script to the document to the db connection
+	if (nil == (connection = self.document.dbconnection))
+		@throw [NSException exceptionWithName:CZExceptionNoDbConnection reason:@"No connection associated with this take." userInfo:nil];
+	
+	// get the prepared statement for this operation
+	if (nil == (statement = [connection statementForName:@"take_delete_by_id"]))
+		@throw [NSException exceptionWithName:CZExceptionNoStatement reason:@"Could not find the required statement" userInfo:nil];
+	
+	// the record must already have been inserted before we can attempt to delete it
+	if (mDatabaseId == 0)
+		@throw [NSException exceptionWithName:CZExceptionIllegalOperation reason:@"Can not delete a record that hasn't yet been inserted" userInfo:nil];
+	
+	// setup
+	[statement bindUint32:mDatabaseId atIndex:1];
+	
+	// execute statement
+	if (![connection exec:statement result:&result])
+		CZ_DBOBJ_ERROR(statement,retval,done);
+	
+	[[self retain] autorelease];
+	[self.document __removeTake:self];
+	[self.document __removeCachedTake:self];
+	
+done:
+	[statement clear];
+	return retval;
+}
+
+/**
+ *
+ *
+ */
+- (DBObjectComparisonResult)dbobjectCompare:(id<DBObject>)anObject
+{
+	CZTake *take = (CZTake *)anObject;
+	
+	if (take->mName == mName &&
+			take->mLabel == mLabel &&
+			take->mPosition == mPosition &&
+			take->mHidden == mHidden &&
+			take->mSuggested == mSuggested &&
+			take->mSlateId == mSlateId &&
+			take->mMediaId == mMediaId)
+		return DBObjectComparisonEquals;
+	else
+		return DBObjectComparisonNotEquals;
+}
+
+/**
+ *
+ *
+ */
+- (id<DBObject>)dbobjectCopy
+{
+	CZTake *take = [self copy];
+	
+	take->mDocument = mDocument;
+	
+	take->mName = [mName retain];
+	take->mLabel = [mLabel retain];
+	take->mPosition = mPosition;
+	take->mHidden = mHidden;
+	take->mSuggested = mSuggested;
+	take->mSlateId = mSlateId;
+	take->mMediaId = mMediaId;
+	
+	// Copy weak refs too:
+	take->mScript = mScript;
+	take->mSlate = mSlate;
+	take->mMedia = mMedia;
+	
+	return take;
+}
+
+
+
+
+
+#pragma mark -
+#pragma mark Private
+
+/**
+ *
+ *
+ */
+- (CZTake *)__dbobjectHandleResult:(DBResult *)result
+{
+	[result getUint32:&mDatabaseId atColumn:0];
+	[result getUint32:&mSlateId atColumn:1];
+	[result getUint32:&mMediaId atColumn:2];
+	[result getString:&mName atColumn:3];
+	[result getString:&mLabel atColumn:4];
+	[result getUint32:&mPosition atColumn:5];
+	[result getUint32:&mHidden atColumn:6];
+	[result getUint32:&mSuggested atColumn:7];
+	
+	return self;
+}
+
+@end

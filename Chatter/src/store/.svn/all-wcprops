@@ -1,0 +1,341 @@
+K 25
+svn:wc:ra_dav:version-url
+V 63
+/svn/svn/!svn/ver/2085/scriptsync/main/src/ScriptSync/src/store
+END
+CZMedia+DBObject.m
+K 25
+svn:wc:ra_dav:version-url
+V 82
+/svn/svn/!svn/ver/1984/scriptsync/main/src/ScriptSync/src/store/CZMedia+DBObject.m
+END
+CZTake+DBObject.h
+K 25
+svn:wc:ra_dav:version-url
+V 81
+/svn/svn/!svn/ver/1444/scriptsync/main/src/ScriptSync/src/store/CZTake+DBObject.h
+END
+DBResult.m
+K 25
+svn:wc:ra_dav:version-url
+V 74
+/svn/svn/!svn/ver/1781/scriptsync/main/src/ScriptSync/src/store/DBResult.m
+END
+CZParagraphStyle+DBObject.h
+K 25
+svn:wc:ra_dav:version-url
+V 91
+/svn/svn/!svn/ver/1444/scriptsync/main/src/ScriptSync/src/store/CZParagraphStyle+DBObject.h
+END
+CZSyncPoint+DBObject.h
+K 25
+svn:wc:ra_dav:version-url
+V 86
+/svn/svn/!svn/ver/1444/scriptsync/main/src/ScriptSync/src/store/CZSyncPoint+DBObject.h
+END
+SQLiteDBStatement.h
+K 25
+svn:wc:ra_dav:version-url
+V 83
+/svn/svn/!svn/ver/1512/scriptsync/main/src/ScriptSync/src/store/SQLiteDBStatement.h
+END
+FcpClip+DBObject.m
+K 25
+svn:wc:ra_dav:version-url
+V 82
+/svn/svn/!svn/ver/1751/scriptsync/main/src/ScriptSync/src/store/FcpClip+DBObject.m
+END
+CZRoughCutSegment+DBObject.m
+K 25
+svn:wc:ra_dav:version-url
+V 92
+/svn/svn/!svn/ver/1512/scriptsync/main/src/ScriptSync/src/store/CZRoughCutSegment+DBObject.m
+END
+CZElement+DBObject.h
+K 25
+svn:wc:ra_dav:version-url
+V 84
+/svn/svn/!svn/ver/1444/scriptsync/main/src/ScriptSync/src/store/CZElement+DBObject.h
+END
+CZTake+DBObject.m
+K 25
+svn:wc:ra_dav:version-url
+V 81
+/svn/svn/!svn/ver/1701/scriptsync/main/src/ScriptSync/src/store/CZTake+DBObject.m
+END
+CZSyncPoint+DBObject.m
+K 25
+svn:wc:ra_dav:version-url
+V 86
+/svn/svn/!svn/ver/1781/scriptsync/main/src/ScriptSync/src/store/CZSyncPoint+DBObject.m
+END
+CZParagraphStyle+DBObject.m
+K 25
+svn:wc:ra_dav:version-url
+V 91
+/svn/svn/!svn/ver/1444/scriptsync/main/src/ScriptSync/src/store/CZParagraphStyle+DBObject.m
+END
+SQLiteDBStatement.m
+K 25
+svn:wc:ra_dav:version-url
+V 83
+/svn/svn/!svn/ver/1512/scriptsync/main/src/ScriptSync/src/store/SQLiteDBStatement.m
+END
+CZElement+DBObject.m
+K 25
+svn:wc:ra_dav:version-url
+V 84
+/svn/svn/!svn/ver/1444/scriptsync/main/src/ScriptSync/src/store/CZElement+DBObject.m
+END
+CZRoughCut+DBObject.h
+K 25
+svn:wc:ra_dav:version-url
+V 85
+/svn/svn/!svn/ver/1444/scriptsync/main/src/ScriptSync/src/store/CZRoughCut+DBObject.h
+END
+SQLiteDBResult.h
+K 25
+svn:wc:ra_dav:version-url
+V 80
+/svn/svn/!svn/ver/1512/scriptsync/main/src/ScriptSync/src/store/SQLiteDBResult.h
+END
+CZSpanLabel+DBObject.h
+K 25
+svn:wc:ra_dav:version-url
+V 86
+/svn/svn/!svn/ver/1444/scriptsync/main/src/ScriptSync/src/store/CZSpanLabel+DBObject.h
+END
+CZSpan+DBObject.h
+K 25
+svn:wc:ra_dav:version-url
+V 81
+/svn/svn/!svn/ver/1444/scriptsync/main/src/ScriptSync/src/store/CZSpan+DBObject.h
+END
+CZRoughCut+DBObject.m
+K 25
+svn:wc:ra_dav:version-url
+V 85
+/svn/svn/!svn/ver/1444/scriptsync/main/src/ScriptSync/src/store/CZRoughCut+DBObject.m
+END
+CZNote+DBObject.h
+K 25
+svn:wc:ra_dav:version-url
+V 81
+/svn/svn/!svn/ver/1439/scriptsync/main/src/ScriptSync/src/store/CZNote+DBObject.h
+END
+SQLiteDBResult.m
+K 25
+svn:wc:ra_dav:version-url
+V 80
+/svn/svn/!svn/ver/1512/scriptsync/main/src/ScriptSync/src/store/SQLiteDBResult.m
+END
+CZSpanLabel+DBObject.m
+K 25
+svn:wc:ra_dav:version-url
+V 86
+/svn/svn/!svn/ver/1444/scriptsync/main/src/ScriptSync/src/store/CZSpanLabel+DBObject.m
+END
+CZSpan+DBObject.m
+K 25
+svn:wc:ra_dav:version-url
+V 81
+/svn/svn/!svn/ver/1444/scriptsync/main/src/ScriptSync/src/store/CZSpan+DBObject.m
+END
+CZNote+DBObject.m
+K 25
+svn:wc:ra_dav:version-url
+V 81
+/svn/svn/!svn/ver/1444/scriptsync/main/src/ScriptSync/src/store/CZNote+DBObject.m
+END
+FcpMetadata+DBObject.h
+K 25
+svn:wc:ra_dav:version-url
+V 86
+/svn/svn/!svn/ver/1751/scriptsync/main/src/ScriptSync/src/store/FcpMetadata+DBObject.h
+END
+CZDocument+DBObject.h
+K 25
+svn:wc:ra_dav:version-url
+V 85
+/svn/svn/!svn/ver/2083/scriptsync/main/src/ScriptSync/src/store/CZDocument+DBObject.h
+END
+CZPreference+DBObject.h
+K 25
+svn:wc:ra_dav:version-url
+V 87
+/svn/svn/!svn/ver/1444/scriptsync/main/src/ScriptSync/src/store/CZPreference+DBObject.h
+END
+CZMetadata+DBObject.h
+K 25
+svn:wc:ra_dav:version-url
+V 85
+/svn/svn/!svn/ver/1744/scriptsync/main/src/ScriptSync/src/store/CZMetadata+DBObject.h
+END
+FcpMetadata+DBObject.m
+K 25
+svn:wc:ra_dav:version-url
+V 86
+/svn/svn/!svn/ver/1751/scriptsync/main/src/ScriptSync/src/store/FcpMetadata+DBObject.m
+END
+CZDocument+DBObject.m
+K 25
+svn:wc:ra_dav:version-url
+V 85
+/svn/svn/!svn/ver/2085/scriptsync/main/src/ScriptSync/src/store/CZDocument+DBObject.m
+END
+CZPreference+DBObject.m
+K 25
+svn:wc:ra_dav:version-url
+V 87
+/svn/svn/!svn/ver/1444/scriptsync/main/src/ScriptSync/src/store/CZPreference+DBObject.m
+END
+CZScriptStyle+DBObject.h
+K 25
+svn:wc:ra_dav:version-url
+V 88
+/svn/svn/!svn/ver/1444/scriptsync/main/src/ScriptSync/src/store/CZScriptStyle+DBObject.h
+END
+CZMetadata+DBObject.m
+K 25
+svn:wc:ra_dav:version-url
+V 85
+/svn/svn/!svn/ver/1744/scriptsync/main/src/ScriptSync/src/store/CZMetadata+DBObject.m
+END
+SQLiteDBConnection.m
+K 25
+svn:wc:ra_dav:version-url
+V 84
+/svn/svn/!svn/ver/1753/scriptsync/main/src/ScriptSync/src/store/SQLiteDBConnection.m
+END
+CZScriptStyle+DBObject.m
+K 25
+svn:wc:ra_dav:version-url
+V 88
+/svn/svn/!svn/ver/1771/scriptsync/main/src/ScriptSync/src/store/CZScriptStyle+DBObject.m
+END
+CZGroup+DBObject.h
+K 25
+svn:wc:ra_dav:version-url
+V 82
+/svn/svn/!svn/ver/1444/scriptsync/main/src/ScriptSync/src/store/CZGroup+DBObject.h
+END
+CZGroup+DBObject.m
+K 25
+svn:wc:ra_dav:version-url
+V 82
+/svn/svn/!svn/ver/2083/scriptsync/main/src/ScriptSync/src/store/CZGroup+DBObject.m
+END
+FcpProject+DBObject.h
+K 25
+svn:wc:ra_dav:version-url
+V 85
+/svn/svn/!svn/ver/1751/scriptsync/main/src/ScriptSync/src/store/FcpProject+DBObject.h
+END
+FcpClipItem+DBObject.h
+K 25
+svn:wc:ra_dav:version-url
+V 86
+/svn/svn/!svn/ver/1126/scriptsync/main/src/ScriptSync/src/store/FcpClipItem+DBObject.h
+END
+FcpBin+DBObject.h
+K 25
+svn:wc:ra_dav:version-url
+V 81
+/svn/svn/!svn/ver/1744/scriptsync/main/src/ScriptSync/src/store/FcpBin+DBObject.h
+END
+CZScript+DBObject.h
+K 25
+svn:wc:ra_dav:version-url
+V 83
+/svn/svn/!svn/ver/1444/scriptsync/main/src/ScriptSync/src/store/CZScript+DBObject.h
+END
+DBStatement.h
+K 25
+svn:wc:ra_dav:version-url
+V 77
+/svn/svn/!svn/ver/1512/scriptsync/main/src/ScriptSync/src/store/DBStatement.h
+END
+FcpProject+DBObject.m
+K 25
+svn:wc:ra_dav:version-url
+V 85
+/svn/svn/!svn/ver/1751/scriptsync/main/src/ScriptSync/src/store/FcpProject+DBObject.m
+END
+FcpClipItem+DBObject.m
+K 25
+svn:wc:ra_dav:version-url
+V 86
+/svn/svn/!svn/ver/1843/scriptsync/main/src/ScriptSync/src/store/FcpClipItem+DBObject.m
+END
+DBObject.h
+K 25
+svn:wc:ra_dav:version-url
+V 74
+/svn/svn/!svn/ver/1781/scriptsync/main/src/ScriptSync/src/store/DBObject.h
+END
+CZSlate+DBObject.h
+K 25
+svn:wc:ra_dav:version-url
+V 82
+/svn/svn/!svn/ver/1444/scriptsync/main/src/ScriptSync/src/store/CZSlate+DBObject.h
+END
+FcpBin+DBObject.m
+K 25
+svn:wc:ra_dav:version-url
+V 81
+/svn/svn/!svn/ver/1751/scriptsync/main/src/ScriptSync/src/store/FcpBin+DBObject.m
+END
+CZScript+DBObject.m
+K 25
+svn:wc:ra_dav:version-url
+V 83
+/svn/svn/!svn/ver/1807/scriptsync/main/src/ScriptSync/src/store/CZScript+DBObject.m
+END
+DBStatement.m
+K 25
+svn:wc:ra_dav:version-url
+V 77
+/svn/svn/!svn/ver/1512/scriptsync/main/src/ScriptSync/src/store/DBStatement.m
+END
+FcpFile+DBObject.h
+K 25
+svn:wc:ra_dav:version-url
+V 82
+/svn/svn/!svn/ver/1744/scriptsync/main/src/ScriptSync/src/store/FcpFile+DBObject.h
+END
+CZSlate+DBObject.m
+K 25
+svn:wc:ra_dav:version-url
+V 82
+/svn/svn/!svn/ver/1517/scriptsync/main/src/ScriptSync/src/store/CZSlate+DBObject.m
+END
+CZMedia+DBObject.h
+K 25
+svn:wc:ra_dav:version-url
+V 82
+/svn/svn/!svn/ver/1444/scriptsync/main/src/ScriptSync/src/store/CZMedia+DBObject.h
+END
+DBResult.h
+K 25
+svn:wc:ra_dav:version-url
+V 74
+/svn/svn/!svn/ver/1781/scriptsync/main/src/ScriptSync/src/store/DBResult.h
+END
+FcpFile+DBObject.m
+K 25
+svn:wc:ra_dav:version-url
+V 82
+/svn/svn/!svn/ver/1751/scriptsync/main/src/ScriptSync/src/store/FcpFile+DBObject.m
+END
+CZRoughCutSegment+DBObject.h
+K 25
+svn:wc:ra_dav:version-url
+V 92
+/svn/svn/!svn/ver/1444/scriptsync/main/src/ScriptSync/src/store/CZRoughCutSegment+DBObject.h
+END
+FcpClip+DBObject.h
+K 25
+svn:wc:ra_dav:version-url
+V 82
+/svn/svn/!svn/ver/1124/scriptsync/main/src/ScriptSync/src/store/FcpClip+DBObject.h
+END

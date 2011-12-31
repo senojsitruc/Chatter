@@ -1,0 +1,22 @@
+//
+//  CZScript.h
+//  ScriptSync
+//
+//  Created by Curtis Jones on 2010.09.15.
+//  Copyright 2010 Nexidia, Inc. All rights reserved.
+//
+
+#import <Cocoa/Cocoa.h>
+#import "CZScript.h"
+#import "DBObject.h"
+
+@class CZDocument;
+
+@interface CZScript (DBObject) <DBObject>
+
+/**
+ *
+ */
++ (NSArray *)dbobjectSelectAllForDocument:(CZDocument *)document;
+
+@end

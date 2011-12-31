@@ -1,0 +1,22 @@
+//
+//  CZSlate+DBObject.h
+//  ScriptSync
+//
+//  Created by Curtis Jones on 2010.10.08.
+//  Copyright 2010 Nexidia, Inc. All rights reserved.
+//
+
+#import <Cocoa/Cocoa.h>
+#import "CZSlate.h"
+#import "DBObject.h"
+
+@class CZDocument;
+
+@interface CZSlate (DBObject) <DBObject>
+
+/**
+ *
+ */
++ (NSArray *)dbobjectSelectAllForDocument:(CZDocument *)document;
+
+@end

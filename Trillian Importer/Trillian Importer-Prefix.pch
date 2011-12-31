@@ -1,0 +1,7 @@
+//
+// Prefix header for all source files of the 'Trillian Importer' target in the 'Trillian Importer' project
+//
+
+#ifdef __OBJC__
+	#import <Cocoa/Cocoa.h>
+#endif

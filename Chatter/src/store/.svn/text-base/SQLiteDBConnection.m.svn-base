@@ -1,0 +1,406 @@
+//
+//  SQLiteDBConnection.m
+//  Get
+//
+//  Created by Curtis Jones on 2010.03.10.
+//  Copyright 2010 Nexidia. All rights reserved.
+//
+
+#import "SQLiteDBConnection.h"
+#import "SQLiteDBResult.h"
+#import "SQLiteDBStatement.h"
+
+@implementation SQLiteDBConnection
+
+#pragma mark -
+#pragma mark Structors
+
+/**
+ *
+ *
+ */
+- (id)initWithFileName:(NSString *)fileName
+{
+	self = [super init];
+	
+	if (self) {
+		mConn = NULL;
+		mFileName = [[NSString alloc] initWithString:fileName];
+	}
+	
+	return self;
+}
+
+/**
+ *
+ *
+ */
+- (void)dealloc
+{
+	[mFileName release];
+	
+	// cleanly disconnect from the database
+	if (mConn != NULL) {
+		sqlite3_close(mConn);
+		mConn = NULL;
+	}
+	
+	[super dealloc];
+}
+
+
+
+
+
+#pragma mark -
+#pragma mark DBConnection
+
+/**
+ *
+ *
+ */
+- (BOOL)connect
+{
+	int error;
+	
+	error = sqlite3_open_v2([mFileName cStringUsingEncoding:NSUTF8StringEncoding], &mConn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_NOMUTEX, NULL);
+	
+	if (SQLITE_OK != error) {
+		NSLog(@"%s.. [%@] failed to connect, %s [%d]", __PRETTY_FUNCTION__, mFileName, sqlite3_errmsg(mConn), error);
+		sqlite3_close(mConn);
+		mConn = NULL;
+		return FALSE;
+	}
+	
+	// we don't want to artifically limit the amount of memory that sqlite will use
+	sqlite3_soft_heap_limit(0);
+	
+	if (SQLITE_OK != (error = sqlite3_busy_timeout(mConn, 5000)))
+		NSLog(@"%s.. failed to sqlite3_busy_timeout(), %d", __PRETTY_FUNCTION__, error);
+	
+	// enable foreign key support
+	if (SQLITE_OK != (error = sqlite3_exec(mConn, "PRAGMA foreign_keys = ON", NULL, NULL, NULL))) {
+		NSLog(@"%s.. failed to 'PRAGMA foreign_keys = ON', %d", __PRETTY_FUNCTION__, error);
+		sqlite3_close(mConn);
+		mConn = NULL;
+		return FALSE;
+	}
+	
+	// disable forced database file synchronization
+	if (SQLITE_OK != (error = sqlite3_exec(mConn, "PRAGMA synchronous = OFF", NULL, NULL, NULL))) {
+		NSLog(@"%s.. failed to 'PRAGMA synchronous = OFF', %d", __PRETTY_FUNCTION__, error);
+		sqlite3_close(mConn);
+		mConn = NULL;
+		return FALSE;
+	}
+	
+	// write ahead logging
+	if (SQLITE_OK != (error = sqlite3_exec(mConn, "PRAGMA journal_mode = WAL", NULL, NULL, NULL))) {
+		NSLog(@"%s.. failed to 'PRAGMA journal_mode = WAL', %d", __PRETTY_FUNCTION__, error);
+		sqlite3_close(mConn);
+		mConn = NULL;
+		return FALSE;
+	}
+	
+	// temporary tables and indicies
+	if (SQLITE_OK != (error = sqlite3_exec(mConn, "PRAGMA temp_store = MEMORY", NULL, NULL, NULL))) {
+		NSLog(@"%s.. failed to 'PRAGMA temp_store = MEMORY', %d", __PRETTY_FUNCTION__, error);
+		sqlite3_close(mConn);
+		mConn = NULL;
+		return FALSE;
+	}
+	
+	/* element */
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_element_insert.sql" andName:@"element_insert"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_element_update_by_id.sql" andName:@"element_update_by_id"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_element_delete_by_id.sql" andName:@"element_delete_by_id"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_element_select_all.sql" andName:@"element_select_all"]];
+	
+	/* fcpbin */
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_fcpbin_insert.sql" andName:@"fcpbin_insert"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_fcpbin_update_by_id.sql" andName:@"fcpbin_update_by_id"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_fcpbin_delete_by_id.sql" andName:@"fcpbin_delete_by_id"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_fcpbin_delete_all_by_projectid_synced.sql" andName:@"fcpbin_delete_all_by_projectid_synced"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_fcpbin_select_by_projectid_uuid.sql" andName:@"fcpbin_select_by_projectid_uuid"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_fcpbin_select_all.sql" andName:@"fcpbin_select_all"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_fcpbin_select_all_by_parentid.sql" andName:@"fcpbin_select_all_by_parentid"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_fcpbin_select_all_by_projectid.sql" andName:@"fcpbin_select_all_by_projectid"]];
+	
+	/* fcpclip */
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_fcpclip_insert.sql" andName:@"fcpclip_insert"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_fcpclip_update_by_id.sql" andName:@"fcpclip_update_by_id"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_fcpclip_delete_by_id.sql" andName:@"fcpclip_delete_by_id"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_fcpclip_select_all.sql" andName:@"fcpclip_select_all"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_fcpclip_select_all_by_projectid.sql" andName:@"fcpclip_select_all_by_projectid"]];
+	
+	/* fcpclipitem */
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_fcpclipitem_insert.sql" andName:@"fcpclipitem_insert"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_fcpclipitem_update_by_id.sql" andName:@"fcpclipitem_update_by_id"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_fcpclipitem_delete_by_id.sql" andName:@"fcpclipitem_delete_by_id"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_fcpclipitem_select_all.sql" andName:@"fcpclipitem_select_all"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_fcpclipitem_select_all_by_clipid.sql" andName:@"fcpclipitem_select_all_by_clipid"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_fcpclipitem_select_all_by_projectid.sql" andName:@"fcpclipitem_select_all_by_projectid"]];
+	
+	/* fcpfile */
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_fcpfile_insert.sql" andName:@"fcpfile_insert"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_fcpfile_update_by_id.sql" andName:@"fcpfile_update_by_id"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_fcpfile_delete_by_id.sql" andName:@"fcpfile_delete_by_id"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_fcpfile_select_by_id.sql" andName:@"fcpfile_select_by_id"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_fcpfile_select_all_by_projectid.sql" andName:@"fcpfile_select_all_by_projectid"]];
+	
+	/* fcpmetadata */
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_fcpmetadata_insert.sql" andName:@"fcpmetadata_insert"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_fcpmetadata_update_by_id.sql" andName:@"fcpmetadata_update_by_id"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_fcpmetadata_delete_by_id.sql" andName:@"fcpmetadata_delete_by_id"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_fcpmetadata_select_all.sql" andName:@"fcpmetadata_select_all"]];
+	
+	/* fcpproject */
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_fcpproject_insert.sql" andName:@"fcpproject_insert"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_fcpproject_update_by_id.sql" andName:@"fcpproject_update_by_id"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_fcpproject_delete_by_id.sql" andName:@"fcpproject_delete_by_id"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_fcpproject_select_all.sql" andName:@"fcpproject_select_all"]];
+	
+	/* group */
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_group_insert.sql" andName:@"group_insert"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_group_update_by_id.sql" andName:@"group_update_by_id"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_group_delete_by_id.sql" andName:@"group_delete_by_id"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_group_select_by_name_parent.sql" andName:@"group_select_by_name_parent"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_group_select_all.sql" andName:@"group_select_all"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_group_item_select_all_by_groupid.sql" andName:@"group_item_select_all_by_groupid"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_group_item_select_all_root_items.sql" andName:@"group_item_select_all_root_items"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_group_item_select_count_by_groupid.sql" andName:@"sql_group_item_select_count_by_groupid"]];
+	
+	/* media */
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_media_insert.sql" andName:@"media_insert"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_media_update_by_id.sql" andName:@"media_update_by_id"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_media_delete_by_id.sql" andName:@"media_delete_by_id"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_media_select_all.sql" andName:@"media_select_all"]];
+	
+	/* metadata */
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_metadata_insert.sql" andName:@"metadata_insert"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_metadata_delete_by_id.sql" andName:@"metadata_delete_by_id"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_metadata_select_all.sql" andName:@"metadata_select_all"]];
+	
+	/* note */
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_note_insert.sql" andName:@"note_insert"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_note_update_by_id.sql" andName:@"note_update_by_id"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_note_delete_by_id.sql" andName:@"note_delete_by_id"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_note_select_all.sql" andName:@"note_select_all"]];
+	
+	/* paragraphstyle */
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_paragraphstyle_insert.sql" andName:@"paragraphstyle_insert"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_paragraphstyle_update_by_id.sql" andName:@"paragraphstyle_update_by_id"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_paragraphstyle_delete_by_id.sql" andName:@"paragraphstyle_delete_by_id"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_paragraphstyle_select_all.sql" andName:@"paragraphstyle_select_all"]];
+	
+	/* preference */
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_preference_insert.sql" andName:@"preference_insert"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_preference_update_by_id.sql" andName:@"preference_update_by_id"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_preference_delete_by_id.sql" andName:@"preference_delete_by_id"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_preference_select_all.sql" andName:@"preference_select_all"]];
+	
+	/* roughcut */
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_roughcut_insert.sql" andName:@"roughcut_insert"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_roughcut_update_by_id.sql" andName:@"roughcut_update_by_id"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_roughcut_delete_by_id.sql" andName:@"roughcut_delete_by_id"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_roughcut_select_all.sql" andName:@"roughcut_select_all"]];
+	
+	/* roughcutsegment */
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_roughcutsegment_insert.sql" andName:@"roughcutsegment_insert"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_roughcutsegment_update_by_id.sql" andName:@"roughcutsegment_update_by_id"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_roughcutsegment_delete_by_id.sql" andName:@"roughcutsegment_delete_by_id"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_roughcutsegment_select_all.sql" andName:@"roughcutsegment_select_all"]];
+	
+	/* script */
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_script_insert.sql" andName:@"script_insert"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_script_update_by_id.sql" andName:@"script_update_by_id"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_script_delete_by_id.sql" andName:@"script_delete_by_id"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_script_select_all.sql" andName:@"script_select_all"]];
+	
+	/* scriptstyle */
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_scriptstyle_insert.sql" andName:@"scriptstyle_insert"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_scriptstyle_update_by_id.sql" andName:@"scriptstyle_update_by_id"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_scriptstyle_delete_by_id.sql" andName:@"scriptstyle_delete_by_id"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_scriptstyle_select_all.sql" andName:@"scriptstyle_select_all"]];
+	
+	/* slate */
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_slate_insert.sql" andName:@"slate_insert"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_slate_update_by_id.sql" andName:@"slate_update_by_id"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_slate_delete_by_id.sql" andName:@"slate_delete_by_id"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_slate_select_all.sql" andName:@"slate_select_all"]];
+	
+	/* span */
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_span_insert.sql" andName:@"span_insert"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_span_update_by_id.sql" andName:@"span_update_by_id"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_span_delete_by_id.sql" andName:@"span_delete_by_id"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_span_select_all.sql" andName:@"span_select_all"]];
+	
+	/* spanlabel */
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_spanlabel_insert.sql" andName:@"spanlabel_insert"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_spanlabel_update_by_id.sql" andName:@"spanlabel_update_by_id"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_spanlabel_delete_by_id.sql" andName:@"spanlabel_delete_by_id"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_spanlabel_select_all.sql" andName:@"spanlabel_select_all"]];
+	
+	/* syncpoint */
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_syncpoint_insert.sql" andName:@"syncpoint_insert"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_syncpoint_update_by_id.sql" andName:@"syncpoint_update_by_id"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_syncpoint_delete_by_id.sql" andName:@"syncpoint_delete_by_id"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_syncpoint_select_all.sql" andName:@"syncpoint_select_all"]];
+	
+	/* take */
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_take_insert.sql" andName:@"take_insert"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_take_update_by_id.sql" andName:@"take_update_by_id"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_take_delete_by_id.sql" andName:@"take_delete_by_id"]];
+	[self setStatement:[SQLiteDBStatement statementWithSqlFile:@"sql_take_select_all.sql" andName:@"take_select_all"]];
+	
+	NSLog(@"%s.. [%@] connected [threadsafe=%d]", __PRETTY_FUNCTION__, mFileName, sqlite3_threadsafe());
+	
+	return TRUE;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)disconnect
+{
+	// cleanly disconnect from the database
+	if (mConn != NULL) {
+		sqlite3_close(mConn);
+		mConn = NULL;
+	}
+	
+	return TRUE;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)prepare:(DBStatement *)_statement
+{
+	int error;
+	SQLiteDBStatement *statement = (SQLiteDBStatement*)_statement;
+	
+	if (mConn == NULL) {
+		NSLog(@"%s.. null database connection", __PRETTY_FUNCTION__);
+		return FALSE;
+	}
+	
+	error = sqlite3_prepare_v2(mConn, [statement.query cStringUsingEncoding:NSUTF8StringEncoding], [statement.query length], &statement->mStmt, NULL);
+	
+	if (SQLITE_OK != error || statement->mStmt == NULL) {
+		NSLog(@"%s.. query = '%@'", __PRETTY_FUNCTION__, statement.query);
+		NSLog(@"%s.. failed to sqlite3_prepare_v2(%@), %d", __PRETTY_FUNCTION__, statement.name, error);
+		return FALSE;
+	}
+	
+	return TRUE;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)exec:(DBStatement *)_statement result:(DBResult **)_result
+{
+	SQLiteDBStatement *statement = (SQLiteDBStatement*)_statement;
+	SQLiteDBResult **result = (SQLiteDBResult **)_result;
+	
+	if (statement->mStmt == NULL) {
+		NSLog(@"%s.. [%@] prepared statement is unprepared", __PRETTY_FUNCTION__, statement.name);
+		return FALSE;
+	}
+	
+	*result = [[[SQLiteDBResult alloc] initWithStatement:statement] autorelease];
+	
+	return [*result next];
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)lastInsertRowId:(NSUInteger *)rowId
+{
+	int64_t _rowid;
+	
+	if (mConn == NULL) {
+		NSLog(@"%s.. null database connection", __PRETTY_FUNCTION__);
+		return FALSE;
+	}
+	
+	_rowid = sqlite3_last_insert_rowid(mConn);
+	*rowId = (NSUInteger)_rowid;
+	
+	return TRUE;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)rowsAffected:(NSUInteger *)rows
+{
+	int _rows = 0;
+	
+	if (mConn == NULL) {
+		NSLog(@"%s.. null database connection", __PRETTY_FUNCTION__);
+		return FALSE;
+	}
+	
+	_rows = sqlite3_changes(mConn);
+	*rows = (NSUInteger)_rows;
+	
+	return TRUE;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)beginTransaction
+{
+	if (mConn == NULL) {
+		NSLog(@"%s.. null database connection", __PRETTY_FUNCTION__);
+		return FALSE;
+	}
+	
+	sqlite3_exec(mConn, "begin", NULL, NULL, NULL);
+	
+	return TRUE;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)commitTransaction
+{
+	if (mConn == NULL) {
+		NSLog(@"%s.. null database connection", __PRETTY_FUNCTION__);
+		return FALSE;
+	}
+	
+	sqlite3_exec(mConn, "commit", NULL, NULL, NULL);
+	
+	return TRUE;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)rollbackTransaction
+{
+	if (mConn == NULL) {
+		NSLog(@"%s.. null database connection", __PRETTY_FUNCTION__);
+		return FALSE;
+	}
+	
+	sqlite3_exec(mConn, "rollback", NULL, NULL, NULL);
+	
+	return TRUE;
+}
+
+@end

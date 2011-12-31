@@ -1,0 +1,281 @@
+//
+//  CZElement.m
+//  ScriptSync
+//
+//  Created by Curtis Jones on 2010.09.15.
+//  Copyright 2010 Nexidia, Inc. All rights reserved.
+//
+
+#import "CZElement+DBObject.h"
+#import "CZScript+DBObject.h"
+#import "CZDocument+DBObject.h"
+#import "CZLinkedListItemImpl.h"
+#import "DBObject.h"
+#import "DBConnection.h"
+#import "DBResult.h"
+#import "DBStatement.h"
+#import "Easy.h"
+
+@interface CZElement (DBObjectPrivate)
+- (CZElement *)__dbobjectHandleResult:(DBResult *)result;
+@end
+
+@implementation CZElement (DBObject)
+
+/**
+ *
+ *
+ */
++ (NSArray *)dbobjectSelectAllForDocument:(CZDocument *)document
+{
+	BOOL retval = TRUE;
+	DBConnection *connection = nil;
+	DBResult *result = nil;
+	DBStatement *statement = nil;
+	CZElement *object = nil;
+	NSMutableArray *objects = [NSMutableArray array];
+	
+	// from the element to the script to the document to the db connection
+	if (nil == (connection = document.dbconnection))
+		@throw [NSException exceptionWithName:CZExceptionNoDbConnection reason:@"No connection associated with this document." userInfo:nil];
+	
+	// get the prepared statement for this operation
+	if (nil == (statement = [connection statementForName:@"element_select_all"]))
+		@throw [NSException exceptionWithName:CZExceptionNoStatement reason:@"Could not find the required statement" userInfo:nil];
+	
+	// execute statement
+	if (![connection exec:statement result:&result])
+		CZ_DBOBJ_ERROR(statement,retval,done);
+	
+	// handle result
+	CZ_DBOBJ_HANDLE([CZElement element], @selector(__addCachedElement:));
+	
+done:
+	[statement clear];
+	return objects;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)dbobjectInsert
+{
+	BOOL retval = TRUE;
+	DBConnection *connection = nil;
+	DBResult *result = nil;
+	DBStatement *statement = nil;
+	NSUInteger databaseId;
+	
+	// from the element to the script to the document to the db connection
+	if (nil == (connection = self.document.dbconnection))
+		@throw [NSException exceptionWithName:CZExceptionNoDbConnection reason:@"No connection associated with this element." userInfo:nil];
+	
+	// get the prepared statement for this operation
+	if (nil == (statement = [connection statementForName:@"element_insert"]))
+		@throw [NSException exceptionWithName:CZExceptionNoStatement reason:@"Could not find the required statement" userInfo:nil];
+	
+	// if this object already has a database key then don't insert it again
+	if (mDatabaseId != 0)
+		@throw [NSException exceptionWithName:CZExceptionIllegalOperation reason:@"Can not insert an already inserted object" userInfo:nil];
+	
+	if (mScriptId == 0)
+		mScriptId = self.script.databaseId;
+	
+	// setup
+	{
+		[statement bindUint32:mScriptId atIndex:1];
+		[statement bindString:[self elementTypeString] atIndex:2];
+		[statement bindString:mText atIndex:3];
+		
+		if (mNextId != 0 || 0 != (mNextId = ((CZElement *)mListItem.nextItem).databaseId))
+			[statement bindUint32:mNextId atIndex:4];
+		else
+			[statement bindNullAtIndex:4];
+		
+		if (mPrevId != 0 || 0 != (mPrevId = ((CZElement *)mListItem.prevItem).databaseId))
+			[statement bindUint32:mPrevId atIndex:5];
+		else
+			[statement bindNullAtIndex:5];
+	}
+	
+	// execute statement
+	if (![connection exec:statement result:&result])
+		CZ_DBOBJ_ERROR(statement,retval,done);
+	
+	// get primary key
+	if (TRUE == [connection lastInsertRowId:&databaseId]) {
+		self.databaseId = databaseId;
+		[self.document __addCachedElement:(CZElement *)[self dbobjectCopy]];
+	}
+	else
+		NSLog(@"%s.. failed to lastInsertRowId()", __PRETTY_FUNCTION__);
+	
+done:
+	[statement clear];
+	return retval;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)dbobjectUpdate
+{
+	BOOL retval = TRUE;
+	DBConnection *connection = nil;
+	DBResult *result = nil;
+	DBStatement *statement = nil;
+	
+	// from the element to the script to the document to the db connection
+	if (nil == (connection = self.document.dbconnection))
+		@throw [NSException exceptionWithName:CZExceptionNoDbConnection reason:@"No connection associated with this element." userInfo:nil];
+	
+	// get the prepared statement for this operation
+	if (nil == (statement = [connection statementForName:@"element_update_by_id"]))
+		@throw [NSException exceptionWithName:CZExceptionNoStatement reason:@"Could not find the required statement" userInfo:nil];
+	
+	// the record must already have been inserted before we can attempt to update it
+	if (mDatabaseId == 0)
+		@throw [NSException exceptionWithName:CZExceptionIllegalOperation reason:@"Can not update a record that hasn't yet been inserted" userInfo:nil];
+	
+	if (mScriptId == 0)
+		mScriptId = self.script.databaseId;
+	
+	// setup
+	{
+		[statement bindUint32:mScriptId atIndex:1];
+		[statement bindString:[self elementTypeString] atIndex:2];
+		[statement bindString:mText atIndex:3];
+		
+		if (mNextId != 0 || 0 != (mNextId = ((CZElement *)mListItem.nextItem).databaseId))
+			[statement bindUint32:mNextId atIndex:4];
+		else
+			[statement bindNullAtIndex:4];
+		
+		if (mPrevId != 0 || 0 != (mPrevId = ((CZElement *)mListItem.prevItem).databaseId))
+			[statement bindUint32:mPrevId atIndex:5];
+		else
+			[statement bindNullAtIndex:5];
+		
+		[statement bindUint32:mDatabaseId atIndex:6];
+	}
+	
+	if ([[self.document __getCachedElementForElement:self] dbobjectCompare:self] == DBObjectComparisonEquals)
+		goto done;
+	
+	// execute statement
+	if (![connection exec:statement result:&result])
+		CZ_DBOBJ_ERROR(statement,retval,done);
+	
+	[self.document __addCachedElement:(CZElement *)[self dbobjectCopy]];
+	
+done:
+	[statement clear];
+	return retval;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)dbobjectDelete
+{
+	BOOL retval = TRUE;
+	DBConnection *connection = nil;
+	DBResult *result = nil;
+	DBStatement *statement = nil;
+	
+	// from the element to the script to the document to the db connection
+	if (nil == (connection = self.document.dbconnection))
+		@throw [NSException exceptionWithName:CZExceptionNoDbConnection reason:@"No connection associated with this element." userInfo:nil];
+	
+	// get the prepared statement for this operation
+	if (nil == (statement = [connection statementForName:@"element_delete_by_id"]))
+		@throw [NSException exceptionWithName:CZExceptionNoStatement reason:@"Could not find the required statement" userInfo:nil];
+	
+	// the record must already have been inserted before we can attempt to delete it
+	if (mDatabaseId == 0)
+		@throw [NSException exceptionWithName:CZExceptionIllegalOperation reason:@"Can not delete a record that hasn't yet been inserted" userInfo:nil];
+	
+	// setup
+	[statement bindUint32:mDatabaseId atIndex:1];
+	
+	// execute statement
+	if (![connection exec:statement result:&result])
+		CZ_DBOBJ_ERROR(statement,retval,done);
+	
+	[[self retain] autorelease];
+	[self.document __removeElement:self];
+	[self.document __removeCachedElement:self];
+	
+done:
+	[statement clear];
+	return retval;
+}
+
+/**
+ *
+ *
+ */
+- (DBObjectComparisonResult)dbobjectCompare:(id<DBObject>)anObject
+{
+	CZElement *element = (CZElement *)anObject;
+	
+	if (element->mType == mType &&
+			element->mText == mText &&
+			element->mScriptId == mScriptId &&
+			element->mNextId == mNextId &&
+			element->mPrevId == mPrevId)
+		return DBObjectComparisonEquals;
+	else
+		return DBObjectComparisonNotEquals;
+}
+
+/**
+ *
+ *
+ */
+- (id<DBObject>)dbobjectCopy
+{
+	CZElement *element = [self copy];
+	
+	element->mType = mType;
+	element->mText = [mText retain];
+	element->mScriptId = mScriptId;
+	element->mNextId = mNextId;
+	element->mPrevId = mPrevId;
+	
+	return element;
+}
+
+
+
+
+
+#pragma mark -
+#pragma mark Private
+
+/**
+ *
+ *
+ */
+- (CZElement *)__dbobjectHandleResult:(DBResult *)result
+{
+	NSString *type = nil;
+	NSString *text = nil;
+	
+	[result getUint32:&mDatabaseId atColumn:0];
+	[result getUint32:&mScriptId atColumn:1];
+	[result getString:&type atColumn:2];
+	[result getString:&text atColumn:3];
+	[result getUint32:&mNextId atColumn:4];
+	[result getUint32:&mPrevId atColumn:5];
+	
+	[self setText:text];
+	[self setElementTypeWithString:type];
+	
+	return self;
+}
+
+@end

@@ -1,0 +1,16 @@
+//
+//  Store.h
+//  Get
+//
+//  Created by Curtis Jones on 2010.03.10.
+//  Copyright 2010 Nexidia. All rights reserved.
+//
+
+#import <Cocoa/Cocoa.h>
+
+@interface Store : NSObject
+{
+	// ...
+}
+
+@end

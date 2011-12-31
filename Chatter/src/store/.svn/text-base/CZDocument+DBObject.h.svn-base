@@ -1,0 +1,634 @@
+//
+//  CZDocument.h
+//  ScriptSync
+//
+//  Created by Curtis Jones on 2010.12.15.
+//  Copyright 2010 Nexidia, Inc. All rights reserved.
+//
+
+#import <Cocoa/Cocoa.h>
+#import "DBObject.h"
+#import "CZDocument.h"
+
+@class CZSpanLabel;
+@class CZElement;
+@class CZGroup;
+@class CZMedia;
+@class CZMetadata;
+@class CZNote;
+@class CZParagraphStyle;
+@class CZPreference;
+@class CZRoughCut;
+@class CZRoughCutSegment;
+@class CZScript;
+@class CZScriptStyle;
+@class CZSlate;
+@class CZSpan;
+@class CZSyncPoint;
+@class CZTake;
+@class FcpProject;
+@class DBConnection;
+@class WorkbenchLanguage;
+
+@interface CZDocument (DBObjectPrivate)
+
+
+
+
+
+/**
+ *
+ */
+- (BOOL)__save;
+
+
+
+
+
+/**
+ *
+ */
+- (CZElement *)__elementForElement:(CZElement *)element;
+
+/**
+ *
+ */
+- (void)__addElement:(CZElement *)element;
+
+/**
+ *
+ */
+- (void)__removeElement:(CZElement *)element;
+
+/**
+ *
+ */
+- (void)__addCachedElement:(CZElement *)element;
+
+/**
+ *
+ */
+- (void)__removeCachedElement:(CZElement *)element;
+
+/**
+ *
+ */
+- (CZElement *)__getCachedElementForElement:(CZElement *)element;
+
+
+
+
+
+/**
+ *
+ */
+- (void)__addGroup:(CZGroup *)group;
+
+/**
+ *
+ */
+- (void)__removeGroup:(CZGroup *)group;
+
+/**
+ *
+ */
+- (void)__renameGroup:(CZGroup *)group withDatabaseId:(NSUInteger)databaseId;
+
+/**
+ *
+ */
+- (void)__addCachedGroup:(CZGroup *)group;
+
+/**
+ *
+ */
+- (void)__removeCachedGroup:(CZGroup *)group;
+
+/**
+ *
+ */
+- (CZGroup *)__getCachedGroupForGroup:(CZGroup *)group;
+
+
+
+
+
+/**
+ *
+ */
+- (void)__addMedia:(CZMedia *)media;
+
+/**
+ *
+ */
+- (void)__removeMedia:(CZMedia *)media;
+
+/**
+ *
+ */
+- (void)__renameMedia:(CZMedia *)media withDatabaseId:(NSUInteger)databaseId;
+
+/**
+ *
+ */
+- (void)__addCachedMedia:(CZMedia *)media;
+
+/**
+ *
+ */
+- (void)__removeCachedMedia:(CZMedia *)media;
+
+/**
+ *
+ */
+- (CZMedia *)__getCachedMediaForMedia:(CZMedia *)media;
+
+
+
+
+
+/**
+ *
+ */
+- (void)loadMetadata;
+
+/**
+ *
+ */
+- (CZMetadata *)metadataWithId:(NSUInteger)metadataId;
+
+/**
+ *
+ */
+- (void)__addMetadata:(CZMetadata *)metadata;
+
+/**
+ *
+ */
+- (void)__removeMetadata:(CZMetadata *)metadata;
+
+/**
+ *
+ */
+- (void)__addCachedMetadata:(CZMetadata *)metadata;
+
+/**
+ *
+ */
+- (void)__removeCachedMetadata:(CZMetadata *)metadata;
+
+/**
+ *
+ */
+- (CZMetadata *)__getCachedMetadataForMetadata:(CZMetadata *)metadata;
+
+
+
+
+
+/**
+ *
+ */
+- (void)__addNote:(CZNote *)note;
+
+/**
+ *
+ */
+- (void)__removeNote:(CZNote *)note;
+
+/**
+ *
+ */
+- (NSArray *)__notesInScript:(CZScript *)script;
+
+/**
+ *
+ */
+- (void)__addCachedNote:(CZNote *)note;
+
+/**
+ *
+ */
+- (void)__removeCachedNote:(CZNote *)note;
+
+/**
+ *
+ */
+- (CZNote *)__getCachedNoteForNote:(CZNote *)note;
+
+
+
+
+
+/**
+ *
+ */
+- (BOOL)__addPreference:(CZPreference *)preference;
+
+/**
+ *
+ */
+- (BOOL)__removePreference:(CZPreference *)preference;
+
+/**
+ *
+ *
+ */
+- (void)__addCachedPreference:(CZPreference *)preference;
+
+/**
+ *
+ */
+- (void)__removeCachedPreference:(CZPreference *)preference;
+
+/**
+ *
+ */
+- (CZPreference *)__getCachedPreferenceForPreference:(CZPreference *)preference;
+
+
+
+
+
+/**
+ *
+ */
+- (BOOL)__addProject:(FcpProject *)project;
+
+/**
+ *
+ */
+- (BOOL)__removeProject:(FcpProject *)project;
+
+
+
+
+
+/**
+ *
+ */
+- (void)__addRoughCut:(CZRoughCut *)roughCut;
+
+/**
+ *
+ */
+- (void)__removeRoughCut:(CZRoughCut *)roughCut;
+
+/**
+ *
+ */
+- (void)__addCachedRoughCut:(CZRoughCut *)roughCut;
+
+/**
+ *
+ */
+- (void)__removeCachedRoughCut:(CZRoughCut *)roughCut;
+
+/**
+ *
+ */
+- (CZRoughCut *)__getCachedRoughCutForRoughCut:(CZRoughCut *)roughCut;
+
+
+
+
+
+/**
+ *
+ */
+- (void)__addRoughCutSegment:(CZRoughCutSegment *)segment;
+
+/**
+ *
+ */
+- (void)__removeRoughCutSegment:(CZRoughCutSegment *)segment;
+
+/**
+ *
+ */
+- (NSArray *)__roughCutSegmentsInRoughCut:(CZRoughCut *)roughcut;
+
+/**
+ *
+ */
+- (void)__addCachedRoughCutSegment:(CZRoughCutSegment *)segment;
+
+/**
+ *
+ */
+- (void)__removeCachedRoughCutSegment:(CZRoughCutSegment *)segment;
+
+/**
+ *
+ */
+- (CZRoughCutSegment *)__getCachedRoughCutSegmentForRoughCutSegment:(CZRoughCutSegment *)segment;
+
+
+
+
+
+/**
+ *
+ */
+- (void)__addScript:(CZScript *)script;
+
+/**
+ *
+ */
+- (void)__removeScript:(CZScript *)script;
+
+/**
+ *
+ */
+- (NSArray *)__notesInElement:(CZElement *)element;
+
+/**
+ *
+ */
+- (void)__addCachedScript:(CZScript *)script;
+
+/**
+ *
+ */
+- (void)__removeCachedScript:(CZScript *)script;
+
+/**
+ *
+ */
+- (CZScript *)__getCachedScriptForScript:(CZScript *)script;
+
+
+
+
+
+/**
+ *
+ */
+- (void)__addScriptStyle:(CZScriptStyle *)scriptStyle;
+
+/**
+ *
+ */
+- (void)__removeScriptStyle:(CZScriptStyle *)scriptStyle;
+
+/**
+ *
+ */
+- (void)__addParagraphStyle:(CZParagraphStyle *)paragraphStyle;
+
+/**
+ *
+ */
+- (void)__removeParagraphStyle:(CZParagraphStyle *)paragraphStyle;
+
+/**
+ *
+ */
+- (void)__addCachedParagraphStyle:(CZParagraphStyle *)paragraphStyle;
+
+/**
+ *
+ */
+- (void)__removeCachedParagraphStyle:(CZParagraphStyle *)paragraphStyle;
+
+/**
+ *
+ */
+- (CZParagraphStyle *)__getCachedParagraphStyleForParagraphStyle:(CZParagraphStyle *)paragraphStyle;
+
+/**
+ *
+ */
+- (void)__addCachedScriptStyle:(CZScriptStyle *)scriptStyle;
+
+/**
+ *
+ */
+- (void)__removeCachedScriptStyle:(CZScriptStyle *)scriptStyle;
+
+/**
+ *
+ */
+- (CZScriptStyle *)__getCachedScriptStyleForScriptStyle:(CZScriptStyle *)scriptStyle;
+
+
+
+
+
+/**
+ *
+ */
+- (void)__addSpan:(CZSpan *)span;
+
+/**
+ *
+ */
+- (void)__removeSpan:(CZSpan *)span;
+
+/**
+ *
+ */
+- (NSArray *)__spansForTake:(CZTake *)take;
+
+/**
+ *
+ */
+- (void)__addCachedSpan:(CZSpan *)span;
+
+/**
+ *
+ */
+- (void)__removeCachedSpan:(CZSpan *)span;
+
+/**
+ *
+ */
+- (CZSpan *)__getCachedSpanForSpan:(CZSpan *)span;
+
+
+
+
+
+/**
+ *
+ */
+- (void)__addSpanLabel:(CZSpanLabel *)spanLabel;
+
+/**
+ *
+ */
+- (void)__removeSpanLabel:(CZSpanLabel *)spanLabel;
+
+/**
+ *
+ */
+- (CZSpanLabel *)spanLabelWithColor:(NSUInteger)color;
+
+/**
+ *
+ */
+- (CZSpanLabel *)spanLabelWithStyle:(NSUInteger)style;
+
+/**
+ *
+ */
+- (NSArray *)spanLabelsWithColors;
+
+/**
+ *
+ */
+- (NSArray *)spanLabelsWithStyles;
+
+/**
+ *
+ */
+- (void)__addCachedSpanLabel:(CZSpanLabel *)spanLabel;
+
+/**
+ *
+ */
+- (void)__removeCachedSpanLabel:(CZSpanLabel *)spanLabel;
+
+/**
+ *
+ */
+- (CZSpanLabel *)__getCachedSpanLabelForSpanLabel:(CZSpanLabel *)spanLabel;
+
+
+
+
+
+/**
+ *
+ */
+- (void)__addSlate:(CZSlate *)slate;
+
+/**
+ *
+ */
+- (void)__removeSlate:(CZSlate *)slate;
+
+/**
+ *
+ */
+- (NSArray *)__slatesInScript:(CZScript *)script;
+
+/**
+ *
+ */
+- (void)__addCachedSlate:(CZSlate *)slate;
+
+/**
+ *
+ */
+- (void)__removeCachedSlate:(CZSlate *)slate;
+
+/**
+ *
+ */
+- (CZSlate *)__getCachedSlateForSlate:(CZSlate *)slate;
+
+
+
+
+
+/**
+ *
+ */
+- (CZSyncPoint *)__syncPointForSyncPoint:(CZSyncPoint *)syncPoint;
+
+/**
+ *
+ */
+- (void)__addSyncPoint:(CZSyncPoint *)syncPoint;
+
+/**
+ *
+ */
+- (void)__removeSyncPoint:(CZSyncPoint *)syncPoint;
+
+/**
+ *
+ */
+- (NSArray *)__syncPointsInElement:(CZElement *)element;
+
+/**
+ *
+ */
+- (NSArray *)__syncPointsInElements:(NSArray *)elements;
+
+/**
+ *
+ */
+- (NSArray *)__syncPointsInScript:(CZScript *)script;
+
+/**
+ *
+ */
+- (NSArray *)__syncPointsInTake:(CZTake *)take;
+
+/**
+ *
+ */
+- (NSArray *)__syncPointsInTakes:(NSArray *)takes;
+
+/**
+ *
+ */
+- (void)__addCachedSyncPoint:(CZSyncPoint *)point;
+
+/**
+ *
+ */
+- (void)__removeCachedSyncPoint:(CZSyncPoint *)point;
+
+/**
+ *
+ */
+- (CZSyncPoint *)__getCachedSyncPointForSyncPoint:(CZSyncPoint *)point;
+
+
+
+
+
+/**
+ *
+ */
+- (CZTake *)__takeForTake:(CZTake *)take;
+
+/**
+ *
+ */
+- (void)__addTake:(CZTake *)take;
+
+/**
+ *
+ */
+- (void)__removeTake:(CZTake *)take;
+
+/**
+ *
+ */
+- (NSArray *)__takesInSlate:(CZSlate *)slate;
+
+/**
+ *
+ */
+- (NSArray *)__takesInScript:(CZScript *)script;
+
+/**
+ *
+ */
+- (void)__addCachedTake:(CZTake *)take;
+
+/**
+ *
+ */
+- (void)__removeCachedTake:(CZTake *)take;
+
+/**
+ *
+ */
+- (CZTake *)__getCachedTakeForTake:(CZTake *)take;
+
+@end

@@ -1,0 +1,278 @@
+//
+//  CZSlate+DBObject.m
+//  ScriptSync
+//
+//  Created by Curtis Jones on 2010.10.08.
+//  Copyright 2010 Nexidia, Inc. All rights reserved.
+//
+
+#import "CZSlate+DBObject.h"
+#import "CZMedia+DBObject.h"
+#import "CZScript+DBObject.h"
+#import "CZDocument+DBObject.h"
+#import "DBConnection.h"
+#import "DBResult.h"
+#import "DBStatement.h"
+#import "Easy.h"
+
+@interface CZSlate (DBObjectPrivate)
+- (CZSlate *)__dbobjectHandleResult:(DBResult *)result;
+@end
+
+@implementation CZSlate (DBObject)
+
+/**
+ *
+ *
+ */
++ (NSArray *)dbobjectSelectAllForDocument:(CZDocument *)document
+{
+	BOOL retval = TRUE;
+	DBConnection *connection = nil;
+	DBResult *result = nil;
+	DBStatement *statement = nil;
+	CZSlate *object = nil;
+	NSMutableArray *objects = [NSMutableArray array];
+	
+	// from the script to the document to the db connection
+	if (nil == (connection = document.dbconnection))
+		@throw [NSException exceptionWithName:CZExceptionNoDbConnection reason:@"No connection associated with this script." userInfo:nil];
+	
+	// get the prepared statement for this operation
+	if (nil == (statement = [connection statementForName:@"slate_select_all"]))
+		@throw [NSException exceptionWithName:CZExceptionNoStatement reason:@"Could not find the required statement" userInfo:nil];
+	
+	// execute statement
+	if (![connection exec:statement result:&result])
+		CZ_DBOBJ_ERROR(statement,retval,done);
+	
+	// handle result
+	CZ_DBOBJ_HANDLE([CZSlate slate], @selector(__addCachedSlate:));
+	
+done:
+	[statement clear];
+	return objects;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)dbobjectInsert
+{
+	BOOL retval = TRUE;
+	DBConnection *connection = nil;
+	DBResult *result = nil;
+	DBStatement *statement = nil;
+	NSUInteger databaseId;
+	
+	// from the script to the document to the db connection
+	if (nil == (connection = self.document.dbconnection))
+		@throw [NSException exceptionWithName:CZExceptionNoDbConnection reason:@"No connection associated with this slate." userInfo:nil];
+	
+	// get the prepared statement for this operation
+	if (nil == (statement = [connection statementForName:@"slate_insert"]))
+		@throw [NSException exceptionWithName:CZExceptionNoStatement reason:@"Could not find the required statement" userInfo:nil];
+	
+	// if this object already has a database key then don't insert it again
+	if (mDatabaseId != 0)
+		@throw [NSException exceptionWithName:CZExceptionIllegalOperation reason:@"Can not insert an already inserted object" userInfo:nil];
+	
+	if (mMediaId == 0)
+		mMediaId = mMedia.databaseId;
+	
+	if (mScriptId == 0)
+		mScriptId = mScript.databaseId;
+	
+	// setup
+	{
+		[statement bindUint32:mScriptId atIndex:1];
+		
+		if (mMediaId != 0)
+			[statement bindUint32:mMediaId atIndex:2];
+		else
+			[statement bindNullAtIndex:2];
+		
+		[statement bindString:mName atIndex:3];
+		[statement bindString:mLabel atIndex:4];
+		[statement bindUint32:mThumbFrame atIndex:5];
+		[statement bindUint32:mHidden atIndex:6];
+	}
+	
+	// execute statement
+	if (![connection exec:statement result:&result])
+		CZ_DBOBJ_ERROR(statement,retval,done);
+	
+	// get primary key
+	if (TRUE == [connection lastInsertRowId:&databaseId]) {
+		self.databaseId = databaseId;
+		[self.document __addCachedSlate:(CZSlate *)[self dbobjectCopy]];
+	}
+	else
+		NSLog(@"%s.. failed to lastInsertRowId()", __PRETTY_FUNCTION__);
+	
+done:
+	[statement clear];
+	return retval;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)dbobjectUpdate
+{
+	BOOL retval = TRUE;
+	DBConnection *connection = nil;
+	DBResult *result = nil;
+	DBStatement *statement = nil;
+	
+	if ([[self.document __getCachedSlateForSlate:self] dbobjectCompare:self] == DBObjectComparisonEquals)
+		return TRUE;
+	
+	// from the script to the document to the db connection
+	if (nil == (connection = self.document.dbconnection))
+		@throw [NSException exceptionWithName:CZExceptionNoDbConnection reason:@"No connection associated with this slate." userInfo:nil];
+	
+	// get the prepared statement for this operation
+	if (nil == (statement = [connection statementForName:@"slate_update_by_id"]))
+		@throw [NSException exceptionWithName:CZExceptionNoStatement reason:@"Could not find the required statement" userInfo:nil];
+	
+	// the record must already have been inserted before we can attempt to update it
+	if (mDatabaseId == 0)
+		@throw [NSException exceptionWithName:CZExceptionIllegalOperation reason:@"Can not update a record that hasn't yet been inserted" userInfo:nil];
+	
+	if (mMediaId == 0)
+		mMediaId = mMedia.databaseId;
+	
+	if (mScriptId == 0)
+		mScriptId = mScript.databaseId;
+	
+	// setup
+	{
+		[statement bindUint32:mScriptId atIndex:1];
+		
+		if (mMediaId != 0)
+			[statement bindUint32:mMediaId atIndex:2];
+		else
+			[statement bindNullAtIndex:2];
+		
+		[statement bindString:mName atIndex:3];
+		[statement bindString:mLabel atIndex:4];
+		[statement bindUint32:mThumbFrame atIndex:5];
+		[statement bindUint32:mHidden atIndex:6];
+		[statement bindUint32:mDatabaseId atIndex:7];
+	}
+	
+	// execute statement
+	if (![connection exec:statement result:&result])
+		CZ_DBOBJ_ERROR(statement,retval,done);
+	
+	[self.document __addCachedSlate:(CZSlate *)[self dbobjectCopy]];
+	
+done:
+	[statement clear];
+	return retval;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)dbobjectDelete
+{
+	BOOL retval = TRUE;
+	DBConnection *connection = nil;
+	DBResult *result = nil;
+	DBStatement *statement = nil;
+	
+	// from the script to the document to the db connection
+	if (nil == (connection = self.document.dbconnection))
+		@throw [NSException exceptionWithName:CZExceptionNoDbConnection reason:@"No connection associated with this slate." userInfo:nil];
+	
+	// get the prepared statement for this operation
+	if (nil == (statement = [connection statementForName:@"slate_delete_by_id"]))
+		@throw [NSException exceptionWithName:CZExceptionNoStatement reason:@"Could not find the required statement" userInfo:nil];
+	
+	// the record must already have been inserted before we can attempt to delete it
+	if (mDatabaseId == 0)
+		@throw [NSException exceptionWithName:CZExceptionIllegalOperation reason:@"Can not delete a record that hasn't yet been inserted" userInfo:nil];
+	
+	// setup
+	[statement bindUint32:mDatabaseId atIndex:1];
+	
+	// execute statement
+	if (![connection exec:statement result:&result])
+		CZ_DBOBJ_ERROR(statement,retval,done);
+	
+	[[self retain] autorelease];
+	[self.document __removeSlate:self];
+	[self.document __removeCachedSlate:self];
+	
+done:
+	[statement clear];
+	return retval;
+}
+
+/**
+ *
+ *
+ */
+- (DBObjectComparisonResult)dbobjectCompare:(id<DBObject>)anObject
+{
+	CZSlate *slate = (CZSlate *)anObject;
+	
+	if (slate->mName == mName &&
+			slate->mLabel == mLabel &&
+			slate->mHidden == mHidden &&
+			slate->mThumbFrame == mThumbFrame &&
+			slate->mMediaId == mMediaId &&
+			slate->mScriptId == mScriptId)
+		return DBObjectComparisonEquals;
+	else
+		return DBObjectComparisonNotEquals;
+}
+
+/**
+ *
+ *
+ */
+- (id<DBObject>)dbobjectCopy
+{
+	CZSlate *slate = [self copy];
+	
+	slate->mName = [mName retain];
+	slate->mLabel = [mLabel retain];
+	slate->mThumbFrame = mThumbFrame;
+	slate->mHidden = mHidden;
+	slate->mMediaId = mMediaId;
+	slate->mScriptId = mScriptId;
+	
+	return slate;
+}
+
+
+
+
+
+#pragma mark -
+#pragma mark Private
+
+/**
+ *
+ *
+ */
+- (CZSlate *)__dbobjectHandleResult:(DBResult *)result
+{
+	[result getUint32:&mDatabaseId atColumn:0];
+	[result getUint32:&mScriptId atColumn:1];
+	[result getUint32:&mMediaId atColumn:2];
+	[result getString:&mName atColumn:3];
+	[result getString:&mLabel atColumn:4];
+	[result getUint32:&mThumbFrame atColumn:5];
+	[result getUint32:&mHidden atColumn:6];
+	
+	return self;
+}
+
+@end

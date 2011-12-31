@@ -1,0 +1,758 @@
+//
+//  CZDocument.m
+//  ScriptSync
+//
+//  Created by Curtis Jones on 2010.09.17.
+//  Copyright 2010 Nexidia, Inc. All rights reserved.
+//
+
+#import "CZDocument.h"
+#import "CZGroup+DBObject.h"
+#import "CZMedia+DBObject.h"
+#import "CZScript+DBObject.h"
+#import "CZScriptTextStorage.h"
+#import "DBConnection.h"
+#import "SQLiteDBConnection.h"
+
+@implementation CZDocument (DBObject)
+
+#pragma mark -
+#pragma mark Database Management
+
+/**
+ * Copies the default database from the application bundle to the document bundle if it doesn't
+ * already exist. This fails if the document bundle directory doesn't exist, as well.
+ *
+ */
+- (BOOL)createDatabase
+{
+	BOOL isDir;
+	NSString *dbdst, *dbsrc;
+	NSError *error;
+	NSFileManager *fileManager = [[[NSFileManager alloc] init] autorelease];
+	
+	NSString *dbPath = self.tmppath;
+	
+	// fail if the path for this document is nil or zero-length
+	if (0 == [dbPath length]) {
+		NSLog(@"%s.. no document path specified.", __PRETTY_FUNCTION__);
+		return FALSE;
+	}
+	
+	// fail if the document directory does not exist and we cannot create it
+	if (FALSE == [fileManager fileExistsAtPath:dbPath isDirectory:&isDir]) {
+		NSLog(@"%s.. document bundle does not exist at '%@'", __PRETTY_FUNCTION__, dbPath);
+		return FALSE;
+	}
+	
+	// or if it happens to be a file instead of a directory
+	else if (FALSE == isDir) {
+		NSLog(@"%s.. document path is not a directory at '%@'", __PRETTY_FUNCTION__, dbPath);
+		return FALSE;
+	}
+	
+	// create the source and destination paths for the database
+	dbdst = [dbPath stringByAppendingPathComponent:@"default.db"];
+	dbsrc = [[NSBundle mainBundle] pathForResource:@"default" ofType:@"db"];
+	
+	// fail if the destination path for the database already exists
+	if (TRUE == [fileManager fileExistsAtPath:dbdst]) {
+		NSLog(@"%s.. the database file already exists for this document at '%@'", __PRETTY_FUNCTION__, dbdst);
+		return FALSE;
+	}
+	
+	// copy the default database from the application bundle to the document bundle
+	if (FALSE == [fileManager copyItemAtPath:dbsrc toPath:dbdst error:&error]) {
+		NSLog(@"%s.. failed to copy '%@' to '%@' because %@", __PRETTY_FUNCTION__, dbsrc, dbdst, [error localizedDescription]);
+		return FALSE;
+	}
+	
+	return TRUE;
+}
+
+/**
+ * Attemps to connect to the database associated with this document (via the mPath member). The
+ * database should be named "default.db". This'll throw an exception if the document is already 
+ * connected to a database. And it'll fail (less forcefully) if the path is nil or invalid or any
+ * one of a number of other things. After success, the database connection object is handed over to
+ * the document for safe keeping.
+ *
+ */
+- (BOOL)connectToDatabase
+{
+	DBConnection *dbconn = nil;
+	
+	NSString *dbPath = self.tmppath;
+	
+	// fail if the document is already connected to a database
+	if (mDbConn != nil)
+		@throw [NSException exceptionWithName:CZExceptionNoDbConnection reason:@"This document is already connected to a database." userInfo:nil];
+	
+	// fail if the path for this document is nil or zero-length
+	if (0 == [dbPath length]) {
+		NSLog(@"%s.. no document path specified.", __PRETTY_FUNCTION__);
+		return FALSE;
+	}
+	
+	// create a new database connection object
+	dbconn = [[SQLiteDBConnection alloc] initWithFileName:[dbPath stringByAppendingPathComponent:@"default.db"]];
+	
+	// attempt to connect to the database
+	if (FALSE == [dbconn connect]) {
+		NSLog(@"%s.. failed to connect", __PRETTY_FUNCTION__);
+		[dbconn release];
+		return FALSE;
+	}
+	
+	// assign the connected database connection object to the document
+	self.dbconnection = dbconn;
+	
+	// we don't need the database connection here any longer
+	[dbconn release];
+	
+	// tell the peepz that everything is good
+	NSLog(@"%s.. connected to database in %@", __PRETTY_FUNCTION__, dbPath);
+	
+	// yee-ha
+	return TRUE;
+}
+
+/**
+ * Attempts to disconnect from the database associated with this document and remove's the 
+ * document's database connection object. This'll throw an exception if the document is not already
+ * connected to a database. Throwing an exception in this case might be a bit over-kill, but we can
+ * adjust this later if that turns out to be the case.
+ *
+ */
+- (BOOL)disconnectFromDatabase
+{
+	// fail if the document is not already connected to a database
+	if (mDbConn == nil)
+		@throw [NSException exceptionWithName:CZExceptionNoDbConnection reason:@"This document is not connected to a database." userInfo:nil];
+	
+	// attempt to disconnect from the database
+	if (FALSE == [mDbConn disconnect]) {
+		NSLog(@"%s.. failed to disconnect?!", __PRETTY_FUNCTION__);
+		return FALSE;
+	}
+	
+	// clear out the document's database connection object
+	self.dbconnection = nil;
+	
+	// yee-ha
+	return TRUE;
+}
+
+
+
+
+
+#pragma mark -
+#pragma mark Groups
+
+/**
+ * Loads all of the groups found in this document's database into the groups array of the document.
+ *
+ */
+- (BOOL)loadGroups
+{
+	NSArray *groups = [CZGroup dbobjectSelectAllForDocument:self];
+	
+	for (CZGroup *group in groups)
+		[mGroups setObject:group forKey:[NSNumber numberWithInteger:group.groupId]];
+	
+	NSLog(@"%s.. loaded %d group(s)", __PRETTY_FUNCTION__, [mGroups count]);
+	
+	return TRUE;
+}
+
+/**
+ *
+ *
+ */
+- (NSArray *)selectAllRootItems
+{
+	BOOL retval = TRUE;
+	DBConnection *connection;
+	DBResult *result = nil;
+	DBStatement *statement = nil;
+	NSMutableArray *groupitems = [NSMutableArray array];
+	
+	// verify that we have a database connection
+	if (nil == (connection = self.dbconnection))
+		@throw [NSException exceptionWithName:CZExceptionNoDbConnection reason:@"No connection associated with this document." userInfo:nil];
+	
+	// get the prepared statement for this operation
+	if (nil == (statement = [connection statementForName:@"group_item_select_all_root_items"]))
+		@throw [NSException exceptionWithName:CZExceptionNoStatement reason:@"Could not find the required statement" userInfo:nil];
+	
+	// execute statement
+	if (![connection exec:statement result:&result])
+		CZ_DBOBJ_ERROR(statement,retval,done);
+	
+	// handle result
+	while (![result isDone]) {
+		NSUInteger itemid = 0;
+		NSString *type = nil;
+		
+		[result getUint32:&itemid atColumn:0];
+		[result getString:&type atColumn:1];
+		
+		if ([type isEqual:@"GROUP"])
+			[groupitems addObject:[self groupWithId:itemid]];
+		else if ([type isEqual:@"SCRIPT"])
+			[groupitems addObject:[self scriptWithId:itemid]];
+//	else if ([type isEqual:@"MEDIA"])
+//		;
+		
+		[result next];
+	}
+	
+done:
+	[statement clear];
+	return groupitems;
+}
+
+/**
+ *
+ *
+ */
+- (CZGroup *)addGroupWithName:(NSString *)name
+{
+	return [self addGroup:[CZGroup groupWithName:name] withParent:nil];
+}
+
+/**
+ *
+ *
+ */
+- (CZGroup *)addGroupWithName:(NSString *)name andParent:(CZGroup *)parent
+{
+	return [self addGroup:[CZGroup groupWithName:name] withParent:parent];
+}
+
+/**
+ *
+ *
+ */
+- (CZGroup *)addGroup:(CZGroup *)group
+{
+	return [self addGroup:group withParent:nil];
+}
+
+/**
+ *
+ *
+ */
+- (CZGroup *)addGroup:(CZGroup *)group withParent:(CZGroup *)parent
+{
+	// if the parent isn't nil, then the parent must have already been added to the database.
+	if (parent != nil && parent.groupId == 0) {
+		NSLog(@"%s.. can't insert group with non-database-backed parent", __PRETTY_FUNCTION__);
+		return nil;
+	}
+	
+	// tell the new group object which document and parent group it belongs to.
+	group.document = self;
+	group.parentId = parent.groupId;
+	
+	// try to insert the new group into the database
+	if (FALSE == [group dbobjectInsert]) {
+		NSLog(@"%s.. failed to insert new group", __PRETTY_FUNCTION__);
+		return nil;
+	}
+	
+	// we retain a copy of each group object keyed on its id
+	[mGroups setObject:group forKey:[NSNumber numberWithInteger:group.groupId]];
+	
+	return group;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)removeGroup:(CZGroup *)group
+{
+	if (group.groupId == 0) {
+		NSLog(@"%s.. can't remove group that is not database backed", __PRETTY_FUNCTION__);
+		return FALSE;
+	}
+	
+	if (FALSE == [group dbobjectDelete]) {
+		NSLog(@"%s.. failed to delete group from database [id=%u, parent=%u, name=%@]", __PRETTY_FUNCTION__, group.groupId, group.parentId, group.name);
+		return FALSE;
+	}
+	
+	return TRUE;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)moveGroup:(CZGroup *)group toParent:(CZGroup *)parent
+{
+	CZGroup *oldParent = nil;
+	
+	// if the parent isn't nil, then the parent must have already been added to the database. if the
+	// parent is nil, then this call is an attempt to move a group to the top-level.
+	if (parent != nil && parent.groupId == 0) {
+		NSLog(@"%s.. can't insert group with non-database-backed parent", __PRETTY_FUNCTION__);
+		return FALSE;
+	}
+	
+	// we do not allow groups to be re-parented until they're in the database
+	if (group.groupId == 0) {
+		NSLog(@"%s.. a group must be added to the database before it can be re-parented", __PRETTY_FUNCTION__);
+		return FALSE;
+	}
+	
+	// if the parent is nil then this is an attempt to move a group to the top-level; and if the group
+	// is already a top-level group (ie, it has no parent), then we're already done.
+	if (parent == nil && group.parentId == 0) {
+		NSLog(@"%s.. this group is already a top-level group", __PRETTY_FUNCTION__);
+		return TRUE;
+	}
+	
+	// you can not set a group to be its own parent. really. don't try it.
+	if (group.groupId == parent.groupId) {
+		NSLog(@"%s.. you may not assign a group to be its own parent", __PRETTY_FUNCTION__);
+		return FALSE;
+	}
+	
+	// if the new parent group is already the parent of this group then we have nothing to do
+	if (group.parentId == parent.groupId)
+		return FALSE;
+	
+	// get the current parent and remove ourself from it as a child
+	oldParent = [self groupWithId:parent.groupId];
+	
+	// add the group as a child to the new parent
+	group.parentId = parent.groupId;
+	
+	// save our "adoption" change back to the database
+	if (FALSE == [group save]) {
+		NSLog(@"%s.. failed to re-parent group", __PRETTY_FUNCTION__);
+		return FALSE;
+	}
+	
+	return TRUE;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)renameGroup:(CZGroup *)group withName:(NSString *)name
+{
+	NSString *oldName = nil;
+	
+	// the group must be added to the database before it can be re-named
+	if (group.groupId == 0) {
+		NSLog(@"%s.. you can not rename a group that hasn't yet been added to the database.", __PRETTY_FUNCTION__);
+		return FALSE;
+	}
+	
+	// when renaming a group, you must pick a new name
+	if ([group.name isEqual:name]) {
+		NSLog(@"%s.. you can not rename a group to its existing name.", __PRETTY_FUNCTION__);
+		return FALSE;
+	}
+	
+	// keep a copy of the old name so that we can restore it if save() fails
+	oldName = [group.name retain];
+	
+	// try to save the group with its new name; restore its old name if save() fails
+	if (FALSE == [group save]) {
+		NSLog(@"%s.. failed to rename group to, %@", __PRETTY_FUNCTION__, name);
+		group.name = oldName;
+		[oldName release];
+		return FALSE;
+	}
+	
+	[oldName release];
+	
+	return TRUE;
+}
+
+/**
+ *
+ *
+ */
+- (CZGroup *)groupWithId:(NSUInteger)groupId
+{
+	if (groupId == 0)
+		return nil;
+	
+	return [mGroups objectForKey:[NSNumber numberWithInteger:groupId]];
+}
+
+/**
+ *
+ *
+ */
+- (CZGroup *)groupWithName:(NSString *)name andParent:(CZGroup *)group
+{
+	return [CZGroup dbobjectSelectForName:name inParent:group];
+}
+
+
+
+
+
+#pragma mark -
+#pragma mark Scripts
+
+/**
+ * Loads all of the scripts found in this document's database into the scripts array of the document.
+ *
+ */
+- (BOOL)loadScripts
+{
+	for (CZScript *script in [CZScript dbobjectSelectAllForDocument:self]) {
+		script.textStorage = [[[CZScriptTextStorage alloc] initWithScript:script] autorelease];
+		[self addScript:script];
+	}
+	
+	NSLog(@"%s.. loaded %d script(s)", __PRETTY_FUNCTION__, [mScripts count]);
+	
+	return TRUE;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)addScript:(CZScript *)script
+{
+	NSNumber *key = nil;
+	
+	// start by giving us an actual script, thank you
+	if (script == nil) {
+		NSLog(@"%s.. you can not add a null script", __PRETTY_FUNCTION__);
+		return FALSE;
+	}
+	
+	// you may not take a script from one document and just add it wholesale to another document. at
+	// least not yet ... there might be value in doing this in the future though.
+	if (script.document != nil && script.document != self) {
+		NSLog(@"%s.. this script already belongs to another document. what are you doing?", __PRETTY_FUNCTION__);
+		return FALSE;
+	}
+	
+	// the script is now a part of this document
+	script.document = self;
+	
+	// if the script isn't already in the database, add it
+	if (script.scriptId == 0) {
+		if (FALSE == [script dbobjectInsert]) {
+			NSLog(@"%s.. failed to add script to the database", __PRETTY_FUNCTION__);
+			return FALSE;
+		}
+	}
+	
+	key = [NSNumber numberWithInteger:script.scriptId];
+	
+	// if we already have a script with that id in this document then something is tragically wrong
+	if (nil != [mScripts objectForKey:key]) {
+		NSLog(@"%s.. you can not add a script with an identical key", __PRETTY_FUNCTION__);
+		return FALSE;
+	}
+	
+	[mScripts setObject:script forKey:key];
+	
+	return TRUE;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)removeScript:(CZScript *)script
+{
+	// start by giving us an actual script, thank you
+	if (script == nil) {
+		NSLog(@"%s.. you can not remove a null script", __PRETTY_FUNCTION__);
+		return FALSE;
+	}
+	
+	// if the script has a database key then attempt to delete it from the database
+	if (script.scriptId != 0) {
+		if (FALSE == [script dbobjectDelete]) {
+			NSLog(@"%s.. failed to delete script with id = %u", __PRETTY_FUNCTION__, script.scriptId);
+			return FALSE;
+		}
+	}
+	
+	// remove the script from our cache
+	[mScripts removeObjectForKey:[NSNumber numberWithInteger:script.scriptId]];
+	
+	return TRUE;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)moveScript:(CZScript *)script toParent:(CZGroup *)parent
+{
+	CZGroup *oldParent = nil;
+	
+	// if the parent isn't nil, then the parent must have already been added to the database. if the
+	// parent is nil, then this call is an attempt to move a script to the top-level.
+	if (parent != nil && parent.groupId == 0) {
+		NSLog(@"%s.. can't insert group with non-database-backed parent", __PRETTY_FUNCTION__);
+		return FALSE;
+	}
+	
+	// we do not allow script to be re-parented until they're in the database
+	if (script.groupId == 0) {
+		NSLog(@"%s.. a script must be added to the database before it can be re-parented", __PRETTY_FUNCTION__);
+		return FALSE;
+	}
+	
+	// if the parent is nil then this is an attempt to move a script to the top-level; and if the script
+	// is already a top-level script (ie, it has no parent), then we're already done.
+	if (parent == nil && script.groupId == 0) {
+		NSLog(@"%s.. this script is already a top-level script", __PRETTY_FUNCTION__);
+		return TRUE;
+	}
+	
+	// if the new parent group is already the parent of this script then we have nothing to do
+	if (script.groupId == parent.groupId)
+		return FALSE;
+	
+	// get the current parent and remove ourself from it as a child
+	oldParent = [self groupWithId:parent.groupId];
+	
+	// add the script as a child to the new parent
+	script.groupId = parent.groupId;
+	
+	// save our "adoption" change back to the database
+	if (FALSE == [script save]) {
+		NSLog(@"%s.. failed to re-parent media", __PRETTY_FUNCTION__);
+		return FALSE;
+	}
+	
+	return TRUE;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)renameScript:(CZScript *)script withName:(NSString *)name
+{
+	NSString *oldName = nil;
+	
+	// the script must be added to the database before it can be re-named
+	if (script.scriptId == 0) {
+		NSLog(@"%s.. you can not rename a script that hasn't yet been added to the database.", __PRETTY_FUNCTION__);
+		return FALSE;
+	}
+	
+	// when renaming a script, you must pick a new name
+	if ([script.name isEqual:name]) {
+		NSLog(@"%s.. you can not rename a group to its existing name.", __PRETTY_FUNCTION__);
+		return FALSE;
+	}
+	
+	// keep a copy of the old name so that we can restore it if save() fails
+	oldName = [script.name retain];
+	
+	// rename the script object
+	script.name = name;
+	
+	// try to save the script with its new name; restore its old name if save() fails
+	if (FALSE == [script save]) {
+		NSLog(@"%s.. failed to rename script to, %@", __PRETTY_FUNCTION__, name);
+		script.name = oldName;
+		[oldName release];
+		return FALSE;
+	}
+	
+	[oldName release];
+	
+	return TRUE;
+}
+
+/**
+ *
+ *
+ */
+- (CZScript *)scriptWithId:(NSUInteger)scriptId
+{
+	return [mScripts objectForKey:[NSNumber numberWithInteger:scriptId]];
+}
+
+
+
+
+
+#pragma mark -
+#pragma mark Media
+
+/**
+ * Loads all of the media found in this document's database into the media array of the document.
+ *
+ */
+- (BOOL)loadMedia
+{
+	NSArray *medii = [CZMedia dbobjectSelectAllForDocument:self];
+	
+	for (CZMedia *media in medii)
+		[mMedia setObject:media forKey:[NSNumber numberWithInteger:media.mediaId]];
+	
+	NSLog(@"%s.. loaded %d media(s)", __PRETTY_FUNCTION__, [mMedia count]);
+	
+	return TRUE;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)addMedia:(CZMedia *)media
+{
+	return [self addMedia:media withParent:nil];
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)addMedia:(CZMedia *)media withParent:(CZGroup *)group
+{
+	// if the parent isn't nil, then the parent must have already been added to the database.
+	if (group != nil && group.groupId == 0) {
+		NSLog(@"%s.. can't insert group with non-database-backed parent", __PRETTY_FUNCTION__);
+		return FALSE;
+	}
+	
+	// tell the new media object which document and parent group it belongs to.
+	media.document = self;
+	media.groupId = group.groupId;
+	
+	// try to insert the new group into the database
+	if (FALSE == [media dbobjectInsert]) {
+		NSLog(@"%s.. failed to insert new media", __PRETTY_FUNCTION__);
+		return FALSE;
+	}
+	
+	// we retain a copy of each group object keyed on its id
+	[mMedia setObject:media forKey:[NSNumber numberWithInteger:media.mediaId]];
+	
+	return TRUE;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)removeMedia:(CZMedia *)media
+{
+	// start by giving us an actual media, thank you
+	if (media == nil) {
+		NSLog(@"%s.. you can not remove a null media", __PRETTY_FUNCTION__);
+		return FALSE;
+	}
+	
+	// if this media item has a database key, then attempt to delete it from the database
+	if (media.mediaId != 0) {
+		if (FALSE == [media dbobjectDelete]) {
+			NSLog(@"%s.. failed to delete media with id = %u", __PRETTY_FUNCTION__, media.mediaId);
+			return FALSE;
+		}
+	}
+	
+	// remove the media object from our cache
+	[mMedia removeObjectForKey:[NSNumber numberWithInteger:media.mediaId]];
+	
+	return TRUE;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)moveMedia:(CZMedia *)media toParent:(CZGroup *)parent
+{
+	CZGroup *oldParent = nil;
+	
+	// if the parent isn't nil, then the parent must have already been added to the database. if the
+	// parent is nil, then this call is an attempt to move a media to the top-level.
+	if (parent != nil && parent.groupId == 0) {
+		NSLog(@"%s.. can't insert group with non-database-backed parent", __PRETTY_FUNCTION__);
+		return FALSE;
+	}
+	
+	// we do not allow media to be re-parented until they're in the database
+	if (media.groupId == 0) {
+		NSLog(@"%s.. a media must be added to the database before it can be re-parented", __PRETTY_FUNCTION__);
+		return FALSE;
+	}
+	
+	// if the parent is nil then this is an attempt to move a media to the top-level; and if the media
+	// is already a top-level media (ie, it has no parent), then we're already done.
+	if (parent == nil && media.groupId == 0) {
+		NSLog(@"%s.. this media is already a top-level media", __PRETTY_FUNCTION__);
+		return TRUE;
+	}
+	
+	// if the new parent group is already the parent of this media then we have nothing to do
+	if (media.groupId == parent.groupId)
+		return FALSE;
+	
+	// get the current parent and remove ourself from it as a child
+	oldParent = [self groupWithId:parent.groupId];
+	
+	// add the media as a child to the new parent
+	media.groupId = parent.groupId;
+	
+	// save our "adoption" change back to the database
+	if (FALSE == [media save]) {
+		NSLog(@"%s.. failed to re-parent media", __PRETTY_FUNCTION__);
+		return FALSE;
+	}
+	
+	return TRUE;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)renameMedia:(CZMedia *)media withName:(NSString *)name
+{
+	NSString *oldName = nil;
+	
+	// the media must be added to the database before it can be re-named
+	if (media.mediaId == 0) {
+		NSLog(@"%s.. you can not rename a media that hasn't yet been added to the database.", __PRETTY_FUNCTION__);
+		return FALSE;
+	}
+	
+	// when renaming a media, you must pick a new name
+	if ([media.name isEqual:name]) {
+		NSLog(@"%s.. you can not rename a group to its existing name.", __PRETTY_FUNCTION__);
+		return FALSE;
+	}
+	
+	// keep a copy of the old name so that we can restore it if save() fails
+	oldName = [media.name retain];
+	
+	// try to save the media with its new name; restore its old name if save() fails
+	if (FALSE == [media save]) {
+		NSLog(@"%s.. failed to rename media to, %@", __PRETTY_FUNCTION__, name);
+		media.name = oldName;
+		[oldName release];
+		return FALSE;
+	}
+	
+	[oldName release];
+	
+	return TRUE;
+}
+
+@end

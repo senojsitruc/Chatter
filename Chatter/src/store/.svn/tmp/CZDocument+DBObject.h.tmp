@@ -1,0 +1,158 @@
+//
+//  CZDocument+DBObject.h
+//  ScriptSync
+//
+//  Created by Curtis Jones on 2010.09.17.
+//  Copyright 2010 Nexidia, Inc. All rights reserved.
+//
+
+#import <Cocoa/Cocoa.h>
+#import "DBObject.h"
+#import "../CZDocument.h"
+
+@class CZScript;
+
+@interface CZDocument (DBObject)
+
+/**
+ * Creates the default database in the new document.
+ */
+- (BOOL)createDatabase;
+
+/**
+ * Connect to the database in the document bundle.
+ */
+- (BOOL)connectToDatabase;
+
+/**
+ * Disconnect from the database in the document bundle.
+ */
+- (BOOL)disconnectFromDatabase;
+
+
+
+
+
+
+/**
+ * Loads all of the groups found in this document's database into the groups dictionary. of the 
+ * document. These groups are added (by group id) into the groups, over-writing existing entries
+ * with the same id.
+ */
+- (BOOL)loadGroups;
+
+/**
+<<<<<<< .mine
+ * Returns an array of all of the top-level groups (ie, groups that are not children of any other
+ * group.
+ */
+- (NSArray *)selectAllRootGroups;
+
+/**
+ *
+ */
+- (CZGroup *)addGroupWithName:(NSString *)name;
+
+/**
+ *
+ */
+- (CZGroup *)addGroupWithName:(NSString *)name andParent:(CZGroup *)parent;
+
+/**
+ *
+ */
+- (CZGroup *)addGroup:(CZGroup *)group;
+
+/**
+ *
+ */
+- (CZGroup *)addGroup:(CZGroup *)group withParent:(CZGroup *)parent;
+
+/**
+ *
+ */
+- (BOOL)removeGroup:(CZGroup *)group;
+
+/**
+ *
+ */
+- (BOOL)moveGroup:(CZGroup *)group toParent:(CZGroup *)parent;
+
+/**
+ *
+ */
+- (CZGroup *)groupWithId:(NSUInteger)groupId;
+
+
+
+
+
+/**
+=======
+ * Returns an array of all of the top-level items (ie, groups, scripts, media). Each object in the
+ * array conforms to the CZGroupItem protocol. This is a guarantee you can take to the bank.
+ */
+- (NSArray *)selectAllRootItems;
+
+/**
+ *
+ */
+- (CZGroup *)addGroupWithName:(NSString *)name;
+
+/**
+ *
+ */
+- (CZGroup *)addGroupWithName:(NSString *)name andParent:(CZGroup *)parent;
+
+/**
+ *
+ */
+- (CZGroup *)addGroup:(CZGroup *)group;
+
+/**
+ *
+ */
+- (CZGroup *)addGroup:(CZGroup *)group withParent:(CZGroup *)parent;
+
+/**
+ *
+ */
+- (BOOL)removeGroup:(CZGroup *)group;
+
+/**
+ *
+ */
+- (BOOL)moveGroup:(CZGroup *)group toParent:(CZGroup *)parent;
+
+/**
+ *
+ */
+- (BOOL)renameGroup:(CZGroup *)group withName:(NSString *)name;
+
+/**
+ *
+ */
+- (CZGroup *)groupWithId:(NSUInteger)groupId;
+
+
+
+
+
+/**
+>>>>>>> .r898
+ * Loads all of the scripts from this document's database into the scripts array. These scripts are
+ * appended onto the array.
+ */
+- (BOOL)loadScripts;
+
+/**
+ *
+ */
+- (CZScript *)addScript:(CZScript *)script;
+
+/**
+ *
+ */
+- (CZScript *)scriptWithId:(NSUInteger)scriptId;
+
+@end

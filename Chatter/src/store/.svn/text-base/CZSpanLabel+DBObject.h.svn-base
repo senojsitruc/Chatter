@@ -1,0 +1,22 @@
+//
+//  CZSpanLabel+DBObject.h
+//  ScriptSync
+//
+//  Created by Curtis Jones on 2010.12.17.
+//  Copyright 2010 Nexidia, Inc. All rights reserved.
+//
+
+#import <Cocoa/Cocoa.h>
+#import "CZSpanLabel.h"
+#import "DBObject.h"
+
+@class CZDocument;
+
+@interface CZSpanLabel (DBObject) <DBObject>
+
+/**
+ *
+ */
++ (NSArray *)dbobjectSelectAllForDocument:(CZDocument *)document;
+
+@end

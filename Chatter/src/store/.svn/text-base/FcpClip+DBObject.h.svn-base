@@ -1,0 +1,35 @@
+//
+//  FcpClip+DBObject.h
+//  ScriptSync
+//
+//  Created by Curtis Jones on 2010.11.08.
+//  Copyright 2010 Nexidia, Inc. All rights reserved.
+//
+
+#import <Cocoa/Cocoa.h>
+#import "DBObject.h"
+#import "../fcp/FcpClip.h"
+
+@interface FcpClip (DBObject)
+
+/**
+ *
+ */
+- (BOOL)dbobjectInsert;
+
+/**
+ *
+ */
+- (BOOL)dbobjectUpdate;
+
+/**
+ *
+ */
+- (BOOL)dbobjectDelete;
+
+/**
+ *
+ */
++ (NSArray *)dbobjectSelectAllForParent:(FcpObject *)parent;
+
+@end

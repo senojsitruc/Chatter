@@ -1,0 +1,22 @@
+//
+//  CZMetadata+DBObject.h
+//  ScriptSync
+//
+//  Created by Curtis Jones on 2011.03.09.
+//  Copyright 2011 Nexidia, Inc. All rights reserved.
+//
+
+#import <Foundation/Foundation.h>
+#import "CZMetadata.h"
+#import "DBObject.h"
+
+@class CZDocument;
+
+@interface CZMetadata (DBObject) <DBObject>
+
+/**
+ *
+ */
++ (NSArray *)dbobjectSelectAllForDocument:(CZDocument *)document;
+
+@end

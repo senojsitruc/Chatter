@@ -1,0 +1,22 @@
+//
+//  CZPreference+DBObject.h
+//  ScriptSync
+//
+//  Created by Curtis Jones on 2011.01.18.
+//  Copyright 2011 Nexidia, Inc. All rights reserved.
+//
+
+#import <Cocoa/Cocoa.h>
+#import "CZPreference.h"
+#import "DBObject.h"
+
+@class CZDocument;
+
+@interface CZPreference (DBObject) <DBObject>
+
+/**
+ *
+ */
++ (NSArray *)dbobjectSelectAllForDocument:(CZDocument *)document;
+
+@end

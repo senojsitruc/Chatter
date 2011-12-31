@@ -1,0 +1,324 @@
+//
+//  FcpClipItem+DBObject.m
+//  ScriptSync
+//
+//  Created by Curtis Jones on 2010.10.16.
+//  Copyright 2010 Nexidia, Inc. All rights reserved.
+//
+
+#import "FcpClipItem+DBObject.h"
+#import "CZDocument.h"
+#import "DBObject.h"
+#import "DBConnection.h"
+#import "DBResult.h"
+#import "DBStatement.h"
+#import "FcpBin+DBObject.h"
+#import "FcpClip+DBObject.h"
+#import "FcpFile+DBObject.h"
+#import "FcpProject+DBObject.h"
+#import "Easy.h"
+
+@interface FcpClipItem (DBObjectPrivate)
+- (BOOL)__dbobjectUpdateClipitems;
+- (void)__dbobjectHandleResult:(DBResult *)result;
+@end
+
+@implementation FcpClipItem (DBObject)
+
+/**
+ *
+ *
+ */
+- (BOOL)dbobjectInsert
+{
+	BOOL retval = TRUE;
+	DBConnection *connection = nil;
+	DBResult *result = nil;
+	DBStatement *statement = nil;
+	
+	// from the clipitem to the project to the document to the db connection
+	if (nil == (connection = self.project.document.dbconnection))
+		@throw [NSException exceptionWithName:CZExceptionNoDbConnection reason:@"No connection associated with this fcp clipitem." userInfo:nil];
+	
+	// get the prepared statement for this operation
+	if (nil == (statement = [connection statementForName:@"fcpclipitem_insert"]))
+		@throw [NSException exceptionWithName:CZExceptionNoStatement reason:@"Could not find the required statement" userInfo:nil];
+	
+	// if this object already has a database key then don't insert it again
+	if (mDatabaseId != 0)
+		@throw [NSException exceptionWithName:CZExceptionIllegalOperation reason:@"Can not insert an already inserted object" userInfo:nil];
+	
+	// if the parent object for this clipitem is a bin, then grab the parent's database id
+	
+	// the parent for a clipitem is a clip, sequence or file
+	{
+		FcpObject *parent = self.parent;
+		
+		if ([parent isKindOfClass:[FcpClip class]])
+			mClipId = parent.databaseId;
+//	else if ([parent isKindOfClass:[FcpFile class]])
+//		mFileId = parent.databaseId;
+//	else if ([parent isKindOfClass:[FcpSequence class]])
+//		mSequenceId = parent.databaseId;
+	}
+	
+	// get the file id for the file ident
+	if (mFileId == 0 && [mFileIdent length] != 0)
+		mFileId = ((FcpFile*)[self.project.files objectForKey:mFileIdent]).databaseId;
+	
+	// grab the project's database id
+	mProjectId = self.project.databaseId;
+	
+	// our synced time should be the same as the project's synced time
+	self.synced = self.project.synced;
+	
+	// setup
+	{
+		[statement bindUint32:mProjectId atIndex:1];
+		
+		if (mClipId != 0)
+			[statement bindUint32:mClipId atIndex:2];
+		else
+			[statement bindNullAtIndex:2];
+		
+		if (mFileId != 0)
+			[statement bindUint32:mFileId atIndex:3];
+		else
+			[statement bindNullAtIndex:3];
+		
+		[statement bindString:mName atIndex:4];
+		[statement bindString:mIdent atIndex:5];
+		[statement bindInt32:mDuration atIndex:6];
+		[statement bindInt32:mInPoint atIndex:7];
+		[statement bindInt32:mOutPoint atIndex:8];
+		[statement bindInt32:self.begOffset atIndex:9];
+		[statement bindInt32:self.endOffset atIndex:10];
+		[statement bindUint32:(NSUInteger)self.timebase atIndex:11];
+		[statement bindUint32:(NSUInteger)self.ntsc atIndex:12];
+		[statement bindInt32:mBegPos atIndex:13];
+		[statement bindInt32:mEndPos atIndex:14];
+		[statement bindString:mMasterClip atIndex:15];
+		[statement bindString:mMediaType atIndex:16];
+		[statement bindDate:mSynced atIndex:17];
+	}
+	
+	// execute statement
+	if (![connection exec:statement result:&result])
+		CZ_DBOBJ_ERROR(statement,retval,done);
+	
+	// get primary key
+	if (FALSE == [connection lastInsertRowId:&mDatabaseId])
+		NSLog(@"%s.. failed to lastInsertRowId()", __PRETTY_FUNCTION__);
+	
+	// handle result
+	//[Easy postNotification:CZNotificationClipItemInserted object:self.project.document userInfo:[NSDictionary dictionaryWithObjectsAndKeys:self, CZKeyClipItem, nil]];
+	
+done:
+	[statement clear];
+	return retval;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)dbobjectUpdate
+{
+	BOOL retval = TRUE;
+	DBConnection *connection = nil;
+	DBResult *result = nil;
+	DBStatement *statement = nil;
+	
+	// from the clipitem to the project to the document to the db connection
+	if (nil == (connection = self.project.document.dbconnection))
+		@throw [NSException exceptionWithName:CZExceptionNoDbConnection reason:@"No connection associated with this fcp clipitem." userInfo:nil];
+	
+	// get the prepared statement for this operation
+	if (nil == (statement = [connection statementForName:@"fcpclipitem_update_by_id"]))
+		@throw [NSException exceptionWithName:CZExceptionNoStatement reason:@"Could not find the required statement" userInfo:nil];
+	
+	// the record must already have been inserted before we can attempt to update it
+	if (mDatabaseId == 0)
+		@throw [NSException exceptionWithName:CZExceptionIllegalOperation reason:@"Can not update a record that hasn't yet been inserted" userInfo:nil];
+	
+	// the parent for a clipitem is a clip, sequence or file
+	{
+		FcpObject *parent = self.parent;
+		
+		if ([parent isKindOfClass:[FcpClip class]])
+			mClipId = parent.databaseId;
+//	else if ([parent isKindOfClass:[FcpFile class]])
+//		mFileId = parent.databaseId;
+//	else if ([parent isKindOfClass:[FcpSequence class]])
+//		mSequenceId = parent.databaseId;
+	}
+	
+	// get the file id for the file ident
+	if (mFileId == 0 && [mFileIdent length] != 0)
+		mFileId = ((FcpFile*)[self.project.files objectForKey:mFileIdent]).databaseId;
+	
+	// grab the project's database id
+	mProjectId = self.project.databaseId;
+	
+	// setup
+	{
+		[statement bindUint32:mProjectId atIndex:1];
+		
+		if (mClipId != 0)
+			[statement bindUint32:mClipId atIndex:2];
+		else
+			[statement bindNullAtIndex:2];
+		
+		if (mFileId != 0)
+			[statement bindUint32:mFileId atIndex:3];
+		else
+			[statement bindNullAtIndex:3];
+		
+		[statement bindString:mName atIndex:4];
+		[statement bindString:mIdent atIndex:5];
+		[statement bindInt32:mDuration atIndex:6];
+		[statement bindInt32:mInPoint atIndex:7];
+		[statement bindInt32:mOutPoint atIndex:8];
+		[statement bindInt32:self.begOffset atIndex:9];
+		[statement bindInt32:self.endOffset atIndex:10];
+		[statement bindUint32:(NSUInteger)self.timebase atIndex:11];
+		[statement bindUint32:(NSUInteger)self.ntsc atIndex:12];
+		[statement bindInt32:mBegPos atIndex:13];
+		[statement bindInt32:mEndPos atIndex:14];
+		[statement bindString:mMasterClip atIndex:15];
+		[statement bindString:mMediaType atIndex:16];
+		[statement bindDate:mSynced atIndex:17];
+		
+		[statement bindUint32:mDatabaseId atIndex:18];
+	}
+	
+	// execute statement
+	if (![connection exec:statement result:&result])
+		CZ_DBOBJ_ERROR(statement,retval,done);
+	
+	// handle result
+	//[Easy postNotification:CZNotificationClipItemUpdated object:self.project.document userInfo:[NSDictionary dictionaryWithObjectsAndKeys:self, CZKeyClipItem, nil]];
+	
+done:
+	[statement clear];
+	return retval;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)dbobjectDelete
+{
+	BOOL retval = TRUE;
+	DBConnection *connection = nil;
+	DBResult *result = nil;
+	DBStatement *statement = nil;
+	
+	// from the clipitem to the project to the document to the db connection
+	if (nil == (connection = self.project.document.dbconnection))
+		@throw [NSException exceptionWithName:CZExceptionNoDbConnection reason:@"No connection associated with this fcp clipitem." userInfo:nil];
+	
+	// get the prepared statement for this operation
+	if (nil == (statement = [connection statementForName:@"fcpclipitem_delete_by_id"]))
+		@throw [NSException exceptionWithName:CZExceptionNoStatement reason:@"Could not find the required statement" userInfo:nil];
+	
+	// the record must already have been inserted before we can attempt to update it
+	if (mDatabaseId == 0)
+		@throw [NSException exceptionWithName:CZExceptionIllegalOperation reason:@"Can not update a record that hasn't yet been inserted" userInfo:nil];
+	
+	// setup
+	[statement bindUint32:mDatabaseId atIndex:1];
+	
+	// execute statement
+	if (![connection exec:statement result:&result])
+		CZ_DBOBJ_ERROR(statement,retval,done);
+	
+	// handle result
+	//[Easy postNotification:CZNotificationClipItemDeleted object:self.project.document userInfo:[NSDictionary dictionaryWithObjectsAndKeys:self, CZKeyClipItem, nil]];
+	
+done:
+	[statement clear];
+	return retval;
+}
+
+/**
+ *
+ *
+ */
++ (NSArray *)dbobjectSelectAllForParent:(FcpClip *)parent
+{
+	BOOL retval = TRUE;
+	DBConnection *connection = nil;
+	DBResult *result = nil;
+	DBStatement *statement = nil;
+	NSMutableArray *clipitems = [NSMutableArray array];
+	
+	// from the parent to the project to the document to the db connection
+	if (nil == (connection = parent.project.document.dbconnection))
+		@throw [NSException exceptionWithName:CZExceptionNoDbConnection reason:@"No connection associated with this document." userInfo:nil];
+	
+	// get the prepared statement for this operation
+	if (nil == (statement = [connection statementForName:@"fcpclipitem_select_all_by_clipid"]))
+		@throw [NSException exceptionWithName:CZExceptionNoStatement reason:@"Could not find the required statement" userInfo:nil];
+	
+	// setup
+	[statement bindUint32:parent.databaseId atIndex:1];
+	
+	// execute statement
+	if (![connection exec:statement result:&result])
+		CZ_DBOBJ_ERROR(statement,retval,done);
+	
+	// handle result
+	while (![result isDone]) {
+		FcpClipItem *fcpclipitem = [[[FcpClipItem alloc] init] autorelease];
+		
+		[fcpclipitem __dbobjectHandleResult:result];
+		fcpclipitem.parent = parent;
+		
+		if (fcpclipitem.databaseId != 0)
+			[clipitems addObject:fcpclipitem];
+		
+		[result next];
+	}
+	
+done:
+	[statement clear];
+	return clipitems;
+}
+
+/**
+ *
+ *
+ */
+- (void)__dbobjectHandleResult:(DBResult *)result
+{
+	NSInteger begOffset, endOffset;
+	NSUInteger timebase, ntsc;
+	
+	[result getUint32:&mDatabaseId atColumn:0];
+	[result getUint32:&mProjectId atColumn:1];
+	[result getUint32:&mClipId atColumn:2];
+	[result getUint32:&mFileId atColumn:3];
+	[result getString:&mName atColumn:4];
+	[result getString:&mIdent atColumn:5];
+	[result getInt32:&mDuration atColumn:6];
+	[result getInt32:&mInPoint atColumn:7];
+	[result getInt32:&mOutPoint atColumn:8];
+	[result getInt32:&begOffset atColumn:9];
+	[result getInt32:&endOffset atColumn:10];
+	[result getUint32:&timebase atColumn:11];
+	[result getUint32:&ntsc atColumn:12];
+	[result getInt32:&mBegPos atColumn:13];
+	[result getInt32:&mEndPos atColumn:14];
+	[result getString:&mMasterClip atColumn:15];
+	[result getString:&mMediaType atColumn:16];
+	[result getDate:&mSynced atColumn:17];
+	
+	self.begOffset = begOffset;
+	self.endOffset = endOffset;
+	self.timebase = timebase;
+	self.ntsc = ntsc;
+}
+
+@end

@@ -1,0 +1,284 @@
+//
+//  FcpFile+DBObject.m
+//  ScriptSync
+//
+//  Created by Curtis Jones on 2010.10.13.
+//  Copyright 2010 Nexidia, Inc. All rights reserved.
+//
+
+#import "FcpFile+DBObject.h"
+#import "CZDocument.h"
+#import "DBObject.h"
+#import "DBConnection.h"
+#import "DBResult.h"
+#import "DBStatement.h"
+#import "FcpRate.h"
+#import "FcpFile+DBObject.h"
+#import "FcpProject+DBObject.h"
+#import "Easy.h"
+
+@interface FcpFile (DBObjectPrivate)
+- (BOOL)__dbobjectUpdateBins;
+- (BOOL)__dbobjectUpdateFiles;
+- (void)__dbobjectHandleResult:(DBResult *)result;
+@end
+
+@implementation FcpFile (DBObject)
+
+/**
+ *
+ *
+ */
+- (BOOL)dbobjectInsert
+{
+	BOOL retval = TRUE;
+	DBConnection *connection = nil;
+	DBResult *result = nil;
+	DBStatement *statement = nil;
+	
+	// from the file to the project to the document to the db connection
+	if (nil == (connection = self.project.document.dbconnection))
+		@throw [NSException exceptionWithName:CZExceptionNoDbConnection reason:@"No connection associated with this fcp file." userInfo:nil];
+	
+	// get the prepared statement for this operation
+	if (nil == (statement = [connection statementForName:@"fcpfile_insert"]))
+		@throw [NSException exceptionWithName:CZExceptionNoStatement reason:@"Could not find the required statement" userInfo:nil];
+	
+	// if this object already has a database key then don't insert it again
+	if (mDatabaseId != 0)
+		@throw [NSException exceptionWithName:CZExceptionIllegalOperation reason:@"Can not insert an already inserted object" userInfo:nil];
+	
+	// grab the project's database id
+	mProjectId = self.project.databaseId;
+	
+	// our synced time should be the same as the project's synced time
+	self.synced = self.project.synced;
+	
+	// setup
+	{
+		NSUInteger timebase, ntsc;
+		NSString *avtype;
+		
+		timebase = mRate->mTimebase;
+		ntsc = mRate->mNtsc;
+		avtype = mHasAudio && mHasVideo ? @"both" : mHasAudio ? @"audio" : mHasVideo ? @"video" : @"";
+		
+		[statement bindUint32:mProjectId atIndex:1];
+		[statement bindString:mIdent atIndex:2];
+		[statement bindString:mPath atIndex:3];
+		[statement bindString:mName atIndex:4];
+		[statement bindUint32:mDuration atIndex:5];
+		[statement bindUint32:timebase atIndex:6];
+		[statement bindUint32:ntsc atIndex:7];
+		[statement bindString:avtype atIndex:8];
+		[statement bindUint32:mLocked atIndex:9];
+		[statement bindUint32:mStatus atIndex:10];
+		[statement bindDate:mSynced atIndex:11];
+	}
+	
+	// execute statement
+	if (![connection exec:statement result:&result])
+		CZ_DBOBJ_ERROR(statement,retval,done);
+	
+	// get primary key
+	if (FALSE == [connection lastInsertRowId:&mDatabaseId])
+		NSLog(@"%s.. failed to lastInsertRowId()", __PRETTY_FUNCTION__);
+	
+	// handle result
+	//[Easy postNotification:CZNotificationFileInserted object:self.project.document userInfo:[NSDictionary dictionaryWithObjectsAndKeys:self, CZKeyFile, nil]];
+	
+done:
+	[statement clear];
+	return retval;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)dbobjectUpdate
+{
+	BOOL retval = TRUE;
+	DBConnection *connection = nil;
+	DBResult *result = nil;
+	DBStatement *statement = nil;
+	
+	// from the file to the project to the document to the db connection
+	if (nil == (connection = self.project.document.dbconnection))
+		@throw [NSException exceptionWithName:CZExceptionNoDbConnection reason:@"No connection associated with this fcp file." userInfo:nil];
+	
+	// get the prepared statement for this operation
+	if (nil == (statement = [connection statementForName:@"fcpfile_update_by_id"]))
+		@throw [NSException exceptionWithName:CZExceptionNoStatement reason:@"Could not find the required statement" userInfo:nil];
+	
+	// the record must already have been inserted before we can attempt to update it
+	if (mDatabaseId == 0)
+		@throw [NSException exceptionWithName:CZExceptionIllegalOperation reason:@"Can not update a record that hasn't yet been inserted" userInfo:nil];
+	
+	// grab the project's database id
+	mProjectId = self.project.databaseId;
+	
+	// our synced time should be the same as the project's synced time
+	self.synced = self.project.synced;
+	
+	// setup
+	{
+		NSUInteger timebase, ntsc;
+		NSString *avtype;
+		
+		timebase = mRate->mTimebase;
+		ntsc = mRate->mNtsc;
+		avtype = mHasAudio && mHasVideo ? @"both" : mHasAudio ? @"audio" : mHasVideo ? @"video" : @"";
+		
+		[statement bindUint32:mProjectId atIndex:1];
+		[statement bindString:mIdent atIndex:2];
+		[statement bindString:mPath atIndex:3];
+		[statement bindString:mName atIndex:4];
+		[statement bindUint32:mDuration atIndex:5];
+		[statement bindUint32:timebase atIndex:6];
+		[statement bindUint32:ntsc atIndex:7];
+		[statement bindString:avtype atIndex:8];
+		[statement bindUint32:mLocked atIndex:9];
+		[statement bindUint32:mStatus atIndex:10];
+		[statement bindDate:mSynced atIndex:11];
+	}
+	
+	// execute statement
+	if (![connection exec:statement result:&result])
+		CZ_DBOBJ_ERROR(statement,retval,done);
+	
+	// handle result
+	//[Easy postNotification:CZNotificationFileUpdated object:self.project.document userInfo:[NSDictionary dictionaryWithObjectsAndKeys:self, CZKeyFile, nil]];
+	
+done:
+	[statement clear];
+	return retval;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)dbobjectDelete
+{
+	BOOL retval = TRUE;
+	DBConnection *connection = nil;
+	DBResult *result = nil;
+	DBStatement *statement = nil;
+	
+	// from the file to the project to the document to the db connection
+	if (nil == (connection = self.project.document.dbconnection))
+		@throw [NSException exceptionWithName:CZExceptionNoDbConnection reason:@"No connection associated with this fcp file." userInfo:nil];
+	
+	// get the prepared statement for this operation
+	if (nil == (statement = [connection statementForName:@"fcpfile_delete_by_id"]))
+		@throw [NSException exceptionWithName:CZExceptionNoStatement reason:@"Could not find the required statement" userInfo:nil];
+	
+	// the record must already have been inserted before we can attempt to update it
+	if (mDatabaseId == 0)
+		@throw [NSException exceptionWithName:CZExceptionIllegalOperation reason:@"Can not update a record that hasn't yet been inserted" userInfo:nil];
+	
+	// setup
+	[statement bindUint32:mDatabaseId atIndex:1];
+	
+	// execute statement
+	if (![connection exec:statement result:&result])
+		CZ_DBOBJ_ERROR(statement,retval,done);
+	
+	// handle result
+	//[Easy postNotification:CZNotificationFileDeleted object:self.project.document userInfo:[NSDictionary dictionaryWithObjectsAndKeys:self, CZKeyFile, nil]];
+	
+done:
+	[statement clear];
+	return retval;
+}
+
+/**
+ *
+ *
+ */
++ (NSArray *)dbobjectSelectAllForProject:(FcpProject *)project
+{
+	BOOL retval = TRUE;
+	DBConnection *connection = nil;
+	DBResult *result = nil;
+	DBStatement *statement = nil;
+	NSMutableArray *files = [NSMutableArray array];
+	
+	// from the project to the document to the db connection
+	if (nil == (connection = project.document.dbconnection))
+		@throw [NSException exceptionWithName:CZExceptionNoDbConnection reason:@"No connection associated with this project." userInfo:nil];
+	
+	// get the prepared statement for this operation
+	if (nil == (statement = [connection statementForName:@"fcpfile_select_all_by_projectid"]))
+		@throw [NSException exceptionWithName:CZExceptionNoStatement reason:@"Could not find the required statement" userInfo:nil];
+	
+	// setup
+	[statement bindUint32:project.databaseId atIndex:1];
+	
+	// execute statement
+	if (![connection exec:statement result:&result])
+		CZ_DBOBJ_ERROR(statement,retval,done);
+	
+	// handle result
+	while (![result isDone]) {
+		FcpFile *fcpfile = [[[FcpFile alloc] init] autorelease];
+		
+		[fcpfile __dbobjectHandleResult:result];
+		fcpfile.parent = project;
+		
+		if (fcpfile.databaseId != 0)
+			[files addObject:fcpfile];
+		
+		[result next];
+	}
+	
+done:
+	[statement clear];
+	return files;
+}
+
+/**
+ *
+ *
+ */
+- (void)__dbobjectHandleResult:(DBResult *)result
+{
+	NSUInteger timebase, ntsc;
+	NSString *avtype = nil;
+	
+	[result getUint32:&mDatabaseId atColumn:0];
+	[result getUint32:&mProjectId atColumn:1];
+	[result getString:&mIdent atColumn:2];
+	[result getString:&mPath atColumn:3];
+	[result getString:&mName atColumn:4];
+	[result getInt32:&mDuration atColumn:5];
+	[result getUint32:&timebase atColumn:6];
+	[result getUint32:&ntsc atColumn:7];
+	[result getString:&avtype atColumn:8];
+	[result getUint32:&mLocked atColumn:9];
+	[result getUint32:&mStatus atColumn:10];
+	[result getDate:&mSynced atColumn:11];
+	
+	mRate->mTimebase = timebase;
+	mRate->mNtsc = ntsc;
+	
+	if ([avtype isEqual:@"audio"]) {
+		mHasAudio = TRUE;
+		mHasVideo = FALSE;
+	}
+	else if ([avtype isEqual:@"video"]) {
+		mHasAudio = FALSE;
+		mHasVideo = TRUE;
+	}
+	else if ([avtype isEqual:@"both"]) {
+		mHasAudio = TRUE;
+		mHasVideo = TRUE;
+	}
+	else {
+		mHasAudio = FALSE;
+		mHasVideo = FALSE;
+	}
+}
+
+@end

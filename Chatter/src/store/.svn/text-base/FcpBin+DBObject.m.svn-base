@@ -1,0 +1,338 @@
+//
+//  FcpBin+DBObject.m
+//  ScriptSync
+//
+//  Created by Curtis Jones on 2010.10.07.
+//  Copyright 2010 Nexidia, Inc. All rights reserved.
+//
+
+#import "FcpBin+DBObject.h"
+#import "FcpClip+DBObject.h"
+#import "FcpProject+DBObject.h"
+#import "CZDocument.h"
+#import "DBObject.h"
+#import "DBConnection.h"
+#import "DBResult.h"
+#import "DBStatement.h"
+#import "Easy.h"
+
+@interface FcpBin (DBObjectPrivate)
+- (BOOL)__dbobjectSelectBins;
+- (BOOL)__dbobjectSelectClips;
+- (BOOL)__dbobjectUpdateBins;
+- (BOOL)__dbobjectUpdateClips;
+- (void)__dbobjectHandleResult:(DBResult *)result;
+@end
+
+@implementation FcpBin (DBObject)
+
+/**
+ *
+ *
+ */
+- (BOOL)dbobjectInsert
+{
+	BOOL retval = TRUE;
+	DBConnection *connection = nil;
+	DBResult *result = nil;
+	DBStatement *statement = nil;
+	
+	// from the bin to the project to the document to the db connection
+	if (nil == (connection = self.project.document.dbconnection))
+		@throw [NSException exceptionWithName:CZExceptionNoDbConnection reason:@"No connection associated with this fcp bin." userInfo:nil];
+	
+	// get the prepared statement for this operation
+	if (nil == (statement = [connection statementForName:@"fcpbin_insert"]))
+		@throw [NSException exceptionWithName:CZExceptionNoStatement reason:@"Could not find the required statement" userInfo:nil];
+	
+	// if this object already has a database key then don't insert it again
+	if (mDatabaseId != 0)
+		@throw [NSException exceptionWithName:CZExceptionIllegalOperation reason:@"Can not insert an already inserted object" userInfo:nil];
+	
+	// if the parent object for this bin is another bin, then grab the parent's database id
+	if ([self.parent isKindOfClass:[FcpBin class]])
+		mParentId = self.parent.databaseId;
+	else
+		mParentId = 0;
+	
+	// grab the project's database id
+	mProjectId = self.project.databaseId;
+	
+	// our synced time should be the same as the project's synced time
+	self.synced = self.project.synced;
+	
+	// setup
+	{
+		[statement bindUint32:mProjectId atIndex:1];
+		
+		if (mParentId != 0)
+			[statement bindUint32:mParentId atIndex:2];
+		else
+			[statement bindNullAtIndex:2];
+		
+		[statement bindString:mName atIndex:3];
+		[statement bindString:mUuid atIndex:4];
+		[statement bindDate:mSynced atIndex:5];
+	}
+	
+	// execute statement
+	if (![connection exec:statement result:&result])
+		CZ_DBOBJ_ERROR(statement,retval,done);
+	
+	// get primary key
+	if (FALSE == [connection lastInsertRowId:&mDatabaseId])
+		NSLog(@"%s.. failed to lastInsertRowId()", __PRETTY_FUNCTION__);
+	
+	// insert the bin's bins
+	if (FALSE == [self __dbobjectUpdateBins]) {
+		NSLog(@"%s.. failed to insert/update bins", __PRETTY_FUNCTION__);
+		retval = FALSE;
+		goto done;
+	}
+	
+	// insert the bin's clips
+	if (FALSE == [self __dbobjectUpdateClips]) {
+		NSLog(@"%s.. failed to insert/update clips", __PRETTY_FUNCTION__);
+		retval = FALSE;
+		goto done;
+	}
+	
+	// handle result
+	//[Easy postNotification:CZNotificationBinInserted object:self.project.document userInfo:[NSDictionary dictionaryWithObjectsAndKeys:self, CZKeyBin, nil]];
+	
+done:
+	[statement clear];
+	return retval;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)dbobjectUpdate
+{
+	BOOL retval = TRUE;
+	DBConnection *connection = nil;
+	DBResult *result = nil;
+	DBStatement *statement = nil;
+	
+	// from the bin to the project to the document to the db connection
+	if (nil == (connection = self.project.document.dbconnection))
+		@throw [NSException exceptionWithName:CZExceptionNoDbConnection reason:@"No connection associated with this fcp project." userInfo:nil];
+	
+	// get the prepared statement for this operation
+	if (nil == (statement = [connection statementForName:@"fcpbin_update_by_id"]))
+		@throw [NSException exceptionWithName:CZExceptionNoStatement reason:@"Could not find the required statement" userInfo:nil];
+	
+	// the record must already have been inserted before we can attempt to update it
+	if (mDatabaseId == 0)
+		@throw [NSException exceptionWithName:CZExceptionIllegalOperation reason:@"Can not update a record that hasn't yet been inserted" userInfo:nil];
+	
+	// if the parent object for this bin is another bin, then grab the parent's database id
+	if ([self.parent isKindOfClass:[FcpBin class]])
+		mParentId = self.parent.databaseId;
+	else
+		mParentId = 0;
+	
+	// grab the project's database id
+	mProjectId = self.project.databaseId;
+	
+	// setup
+	{
+		[statement bindUint32:mProjectId atIndex:1];
+		
+		if (mParentId != 0)
+			[statement bindUint32:mParentId atIndex:2];
+		else
+			[statement bindNullAtIndex:2];
+		
+		[statement bindString:mName atIndex:3];
+		[statement bindString:mUuid atIndex:4];
+		[statement bindDate:mSynced atIndex:5];
+		
+		[statement bindUint32:mDatabaseId atIndex:6];
+	}
+	
+	// execute statement
+	if (![connection exec:statement result:&result])
+		CZ_DBOBJ_ERROR(statement,retval,done);
+	
+	// update the bin's bins
+	if (FALSE == [self __dbobjectUpdateBins]) {
+		NSLog(@"%s.. failed to insert/update bins", __PRETTY_FUNCTION__);
+		retval = FALSE;
+		goto done;
+	}
+	
+	// handle result
+	//[Easy postNotification:CZNotificationBinUpdated object:self.project.document userInfo:[NSDictionary dictionaryWithObjectsAndKeys:self, CZKeyBin, nil]];
+	
+done:
+	[statement clear];
+	return retval;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)dbobjectDelete
+{
+	BOOL retval = TRUE;
+	DBConnection *connection = nil;
+	DBResult *result = nil;
+	DBStatement *statement = nil;
+	
+	// from the bin to the project to the document to the db connection
+	if (nil == (connection = self.project.document.dbconnection))
+		@throw [NSException exceptionWithName:CZExceptionNoDbConnection reason:@"No connection associated with this fcp project." userInfo:nil];
+	
+	// get the prepared statement for this operation
+	if (nil == (statement = [connection statementForName:@"fcpbin_delete_by_id"]))
+		@throw [NSException exceptionWithName:CZExceptionNoStatement reason:@"Could not find the required statement" userInfo:nil];
+	
+	// the record must already have been inserted before we can attempt to update it
+	if (mDatabaseId == 0)
+		@throw [NSException exceptionWithName:CZExceptionIllegalOperation reason:@"Can not update a record that hasn't yet been inserted" userInfo:nil];
+	
+	// setup
+	[statement bindUint32:mDatabaseId atIndex:1];
+	
+	// execute statement
+	if (![connection exec:statement result:&result])
+		CZ_DBOBJ_ERROR(statement,retval,done);
+	
+	// handle result
+	//[Easy postNotification:CZNotificationBinDeleted object:self.project.document userInfo:[NSDictionary dictionaryWithObjectsAndKeys:self, CZKeyBin, nil]];
+	
+done:
+	[statement clear];
+	return retval;
+}
+
+/**
+ *
+ *
+ */
++ (NSArray *)dbobjectSelectAllForParent:(FcpObject *)parent
+{
+	BOOL retval = TRUE;
+	DBConnection *connection = nil;
+	DBResult *result = nil;
+	DBStatement *statement = nil;
+	NSMutableArray *bins = [NSMutableArray array];
+	NSUInteger parentId = 0;
+	
+	// from the bin to the project to the document to the db connection
+	if (nil == (connection = parent.project.document.dbconnection))
+		@throw [NSException exceptionWithName:CZExceptionNoDbConnection reason:@"No connection associated with this bin." userInfo:nil];
+	
+	// get the prepared statement for this operation
+	if (nil == (statement = [connection statementForName:@"fcpbin_select_all_by_projectid"]))
+		@throw [NSException exceptionWithName:CZExceptionNoStatement reason:@"Could not find the required statement" userInfo:nil];
+	
+	// setup
+	if ([parent isKindOfClass:[FcpProject class]])
+		[statement bindUint32:parent.databaseId atIndex:1];
+	else if ([parent isKindOfClass:[FcpBin class]]) {
+		[statement bindUint32:parent.project.databaseId atIndex:1];
+		parentId = parent.databaseId;
+	}
+	
+	// execute statement
+	if (![connection exec:statement result:&result])
+		CZ_DBOBJ_ERROR(statement,retval,done);
+	
+	// handle result
+	while (![result isDone]) {
+		FcpBin *fcpbin = [[[FcpBin alloc] init] autorelease];
+		
+		[fcpbin __dbobjectHandleResult:result];
+		fcpbin.parent = parent;
+		
+		if (fcpbin->mParentId != parentId)
+			goto next;
+		
+		if (fcpbin.databaseId != 0)
+			[bins addObject:fcpbin];
+		
+	next:
+		[result next];
+	}
+	
+	// load all of the bins, clips for each bin
+	for (FcpBin *fcpbin in bins) {
+		[fcpbin __dbobjectSelectBins];
+		[fcpbin __dbobjectSelectClips];
+	}
+	
+done:
+	[statement clear];
+	return bins;
+}
+
+/**
+ * Loads in the bins that are in this bin.
+ *
+ */
+- (BOOL)__dbobjectSelectBins
+{
+	for (FcpBin *fcpbin in [FcpBin dbobjectSelectAllForParent:self])
+		[mChildren addObject:fcpbin];
+	
+	return TRUE;
+}
+
+/**
+ * Loads in the clips that are in this bin.
+ *
+ */
+- (BOOL)__dbobjectSelectClips
+{
+	for (FcpClip *fcpclip in [FcpClip dbobjectSelectAllForParent:self])
+		[mChildren addObject:fcpclip];
+	
+	return TRUE;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)__dbobjectUpdateBins
+{
+	for (FcpBin *fcpbin in self.bins) {
+		fcpbin.synced = self.synced;
+		[fcpbin save];
+	}
+	
+	return TRUE;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)__dbobjectUpdateClips
+{
+	for (FcpClip *fcpclip in [self clips])
+		[fcpclip save];
+	
+	return TRUE;
+}
+
+/**
+ *
+ *
+ */
+- (void)__dbobjectHandleResult:(DBResult *)result
+{
+	[result getUint32:&mDatabaseId atColumn:0];
+	[result getUint32:&mProjectId atColumn:1];
+	[result getUint32:&mParentId atColumn:2];
+	[result getString:&mName atColumn:3];
+	[result getString:&mUuid atColumn:4];
+	[result getDate:&mSynced atColumn:5];
+}
+
+@end

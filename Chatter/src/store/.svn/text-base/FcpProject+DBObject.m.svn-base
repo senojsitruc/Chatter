@@ -1,0 +1,391 @@
+//
+//  FcpProject+DBObject.m
+//  ScriptSync
+//
+//  Created by Curtis Jones on 2010.09.28.
+//  Copyright 2010 Nexidia, Inc. All rights reserved.
+//
+
+#import "FcpProject+DBObject.h"
+#import "CZDocument.h"
+#import "DBObject.h"
+#import "DBConnection.h"
+#import "DBResult.h"
+#import "DBStatement.h"
+#import "FcpBin+DBObject.h"
+#import "FcpClip+DBObject.h"
+#import "FcpFile+DBObject.h"
+#import "FcpMetadata+DBObject.h"
+#import "Easy.h"
+
+@interface FcpProject (DBObjectPrivate)
+- (BOOL)__dbobjectSelectBins;
+- (BOOL)__dbobjectSelectFiles;
+- (BOOL)__dbobjectSelectClips;
+- (BOOL)__dbobjectSelectMetadata;
+- (BOOL)__dbobjectUpdateBins;
+- (BOOL)__dbobjectUpdateFiles;
+- (BOOL)__dbobjectUpdateClips;
+- (BOOL)__dbobjectUpdateMetadata;
+- (void)__dbobjectHandleResult:(DBResult *)result;
+@end
+
+@implementation FcpProject (DBObject)
+
+/**
+ *
+ *
+ */
++ (NSArray *)dbobjectSelectAllForDocument:(CZDocument *)document
+{
+	BOOL retval = TRUE;
+	DBConnection *connection = nil;
+	DBResult *result = nil;
+	DBStatement *statement = nil;
+	NSMutableArray *projects = [NSMutableArray arrayWithCapacity:100];
+	
+	// from the document to the db connection
+	if (nil == (connection = document.dbconnection))
+		@throw [NSException exceptionWithName:CZExceptionNoDbConnection reason:@"No connection associated with this document." userInfo:nil];
+	
+	// get the prepared statement for this operation
+	if (nil == (statement = [connection statementForName:@"fcpproject_select_all"]))
+		@throw [NSException exceptionWithName:CZExceptionNoStatement reason:@"Could not find the required statement" userInfo:nil];
+	
+	// execute statement
+	if (![connection exec:statement result:&result])
+		CZ_DBOBJ_ERROR(statement,retval,done);
+	
+	// handle result
+	while (![result isDone]) {
+		FcpProject *project = [[[FcpProject alloc] init] autorelease];
+		
+		[project __dbobjectHandleResult:result];
+		project.document = document;
+		
+		if (project.databaseId != 0)
+			[projects addObject:project];
+		
+		[result next];
+	}
+	
+	// load bins, files and clips for each project
+	for (FcpProject *fcpproject in projects) {
+		[fcpproject __dbobjectSelectBins];
+		[fcpproject __dbobjectSelectFiles];
+		[fcpproject __dbobjectSelectClips];
+		[fcpproject __dbobjectSelectMetadata];
+	}
+	
+done:
+	[statement clear];
+	return projects;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)dbobjectInsert
+{
+	BOOL retval = TRUE;
+	DBConnection *connection = nil;
+	DBResult *result = nil;
+	DBStatement *statement = nil;
+	
+	// from the document to the db connection
+	if (nil == (connection = mDocument.dbconnection))
+		@throw [NSException exceptionWithName:CZExceptionNoDbConnection reason:@"No connection associated with this fcp project." userInfo:nil];
+	
+	// get the prepared statement for this operation
+	if (nil == (statement = [connection statementForName:@"fcpproject_insert"]))
+		@throw [NSException exceptionWithName:CZExceptionNoStatement reason:@"Could not find the required statement" userInfo:nil];
+	
+	// if this object already has a database key then don't insert it again
+	if (mDatabaseId != 0)
+		@throw [NSException exceptionWithName:CZExceptionIllegalOperation reason:@"Can not insert an already inserted object" userInfo:nil];
+	
+	// this datetime will be the basis of our "synced" time for this project and all of its stuff
+	self.synced = [NSDate date];
+	
+	// setup
+	{
+		if (mGroupId != 0)
+			[statement bindUint32:mGroupId atIndex:1];
+		else
+			[statement bindNullAtIndex:1];
+		
+		[statement bindString:mName atIndex:2];
+		[statement bindString:mPath atIndex:3];
+		[statement bindDate:mModified atIndex:4];
+		[statement bindDate:mSynced atIndex:5];
+	}
+	
+	// execute statement
+	if (![connection exec:statement result:&result])
+		CZ_DBOBJ_ERROR(statement,retval,done);
+	
+	// get primary key
+	if (FALSE == [connection lastInsertRowId:&mDatabaseId])
+		NSLog(@"%s.. failed to lastInsertRowId()", __PRETTY_FUNCTION__);
+	
+	// insert/update the project's files
+	if (FALSE == [self __dbobjectUpdateFiles]) {
+		NSLog(@"%s.. failed to insert/update files", __PRETTY_FUNCTION__);
+		retval = FALSE;
+		goto done;
+	}
+	
+	// insert/update the project's bins
+	if (FALSE == [self __dbobjectUpdateBins]) {
+		NSLog(@"%s.. failed to insert/update bins", __PRETTY_FUNCTION__);
+		retval = FALSE;
+		goto done;
+	}
+	
+	// insert/update the project's clips
+	if (FALSE == [self __dbobjectUpdateClips]) {
+		NSLog(@"%s.. failed to insert/update clips", __PRETTY_FUNCTION__);
+		retval = FALSE;
+		goto done;
+	}
+	
+	// insert/update the project's metadata
+	if (FALSE == [self __dbobjectUpdateMetadata]) {
+		NSLog(@"%s.. failed to insert/update metadata", __PRETTY_FUNCTION__);
+		retval = FALSE;
+		goto done;
+	}
+	
+done:
+	[statement clear];
+	return retval;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)dbobjectUpdate
+{
+	BOOL retval = TRUE;
+	DBConnection *connection = nil;
+	DBResult *result = nil;
+	DBStatement *statement = nil;
+	
+	// from the document to the db connection
+	if (nil == (connection = mDocument.dbconnection))
+		@throw [NSException exceptionWithName:CZExceptionNoDbConnection reason:@"No connection associated with this fcp project." userInfo:nil];
+	
+	// get the prepared statement for this operation
+	if (nil == (statement = [connection statementForName:@"fcpproject_update_by_id"]))
+		@throw [NSException exceptionWithName:CZExceptionNoStatement reason:@"Could not find the required statement" userInfo:nil];
+	
+	// the record must already have been inserted before we can attempt to update it
+	if (mDatabaseId == 0)
+		@throw [NSException exceptionWithName:CZExceptionIllegalOperation reason:@"Can not update a record that hasn't yet been inserted" userInfo:nil];
+	
+	// this datetime will be the basis of our "synced" time for this project and all of its stuff
+	self.synced = [NSDate date];
+	
+	// setup
+	{
+		if (mGroupId != 0)
+			[statement bindUint32:mGroupId atIndex:1];
+		else
+			[statement bindNullAtIndex:1];
+		
+		[statement bindString:mName atIndex:1];
+		[statement bindString:mPath atIndex:2];
+		[statement bindDate:mModified atIndex:3];
+		[statement bindDate:mSynced atIndex:4];
+		[statement bindUint32:mDatabaseId atIndex:5];
+	}
+	
+	// execute statement
+	if (![connection exec:statement result:&result])
+		CZ_DBOBJ_ERROR(statement,retval,done);
+	
+	// insert/update the project's files
+	if (FALSE == [self __dbobjectUpdateFiles]) {
+		NSLog(@"%s.. failed to insert/update files", __PRETTY_FUNCTION__);
+		retval = FALSE;
+		goto done;
+	}
+	
+	// update the project's bins
+	if (FALSE == [self __dbobjectUpdateBins]) {
+		NSLog(@"%s.. failed to insert/update bins", __PRETTY_FUNCTION__);
+		retval = FALSE;
+		goto done;
+	}
+	
+	// insert/update the project's clipitems
+	if (FALSE == [self __dbobjectUpdateClips]) {
+		NSLog(@"%s.. failed to insert/update clips", __PRETTY_FUNCTION__);
+		retval = FALSE;
+		goto done;
+	}
+	
+	// insert/update the project's metadata
+	if (FALSE == [self __dbobjectUpdateMetadata]) {
+		NSLog(@"%s.. failed to insert/update metadata", __PRETTY_FUNCTION__);
+		retval = FALSE;
+		goto done;
+	}
+	
+done:
+	[statement clear];
+	return retval;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)__dbobjectUpdateBins
+{
+	for (FcpBin *fcpbin in self.bins)
+		[fcpbin save];
+	
+	return TRUE;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)__dbobjectUpdateFiles
+{
+	for (FcpFile *fcpfile in [mFiles allValues])
+		[fcpfile save];
+	
+	return TRUE;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)__dbobjectUpdateClips
+{
+	for (FcpClip *fcpclip in [self clips])
+		[fcpclip save];
+	
+	return TRUE;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)__dbobjectUpdateMetadata
+{
+	for (FcpMetadata *fcpmetadata in [self metadata])
+		[fcpmetadata save];
+	
+	return TRUE;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)dbobjectDelete
+{
+	BOOL retval = TRUE;
+	DBConnection *connection = nil;
+	DBResult *result = nil;
+	DBStatement *statement = nil;
+	
+	// from the document to the db connection
+	if (nil == (connection = mDocument.dbconnection))
+		@throw [NSException exceptionWithName:CZExceptionNoDbConnection reason:@"No connection associated with this fcp project." userInfo:nil];
+	
+	// get the prepared statement for this operation
+	if (nil == (statement = [connection statementForName:@"fcpproject_delete_by_id"]))
+		@throw [NSException exceptionWithName:CZExceptionNoStatement reason:@"Could not find the required statement" userInfo:nil];
+	
+	// the record must already have been inserted before we can attempt to update it
+	if (mDatabaseId == 0)
+		@throw [NSException exceptionWithName:CZExceptionIllegalOperation reason:@"Can not update a record that hasn't yet been inserted" userInfo:nil];
+	
+	// setup
+	[statement bindUint32:mDatabaseId atIndex:1];
+	
+	// execute statement
+	if (![connection exec:statement result:&result])
+		CZ_DBOBJ_ERROR(statement,retval,done);
+	
+done:
+	[statement clear];
+	return retval;
+}
+
+/**
+ * Loads in the bins that are root-level bins.
+ *
+ */
+- (BOOL)__dbobjectSelectBins
+{
+	for (FcpBin *fcpbin in [FcpBin dbobjectSelectAllForParent:self]) {
+		if (fcpbin->mParentId == 0)
+			[mChildren addObject:fcpbin];
+	}
+	
+	return TRUE;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)__dbobjectSelectFiles
+{
+	for (FcpFile *fcpfile in [FcpFile dbobjectSelectAllForProject:self])
+		[self addFile:fcpfile];
+	
+	return TRUE;
+}
+
+/**
+ * Loads in the clips that are root-level clips.
+ *
+ */
+- (BOOL)__dbobjectSelectClips
+{
+	for (FcpClip *fcpclip in [FcpClip dbobjectSelectAllForParent:self]) {
+		if (fcpclip->mBinId == 0)
+			[mChildren addObject:fcpclip];
+	}
+	
+	return TRUE;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)__dbobjectSelectMetadata
+{
+	for (FcpMetadata *fcpmetadata in [FcpMetadata dbobjectSelectAllForParent:self])
+		[self addMetadata:fcpmetadata];
+	
+	return TRUE;
+}
+
+/**
+ *
+ *
+ */
+- (void)__dbobjectHandleResult:(DBResult *)result
+{
+	[result getUint32:&mDatabaseId atColumn:0];
+	[result getUint32:&mGroupId atColumn:1];
+	[result getString:&mName atColumn:2];
+	[result getString:&mPath atColumn:3];
+	[result getDate:&mModified atColumn:4];
+	[result getDate:&mSynced atColumn:5];
+}
+
+@end

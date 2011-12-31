@@ -1,0 +1,22 @@
+//
+//  CZNote+DBObject.h
+//  ScriptSync
+//
+//  Created by Curtis Jones on 2011.01.03.
+//  Copyright 2011 Nexidia, Inc. All rights reserved.
+//
+
+#import <Cocoa/Cocoa.h>
+#import "CZNote.h"
+#import "DBObject.h"
+
+@class CZDocument;
+
+@interface CZNote (DBObject) <DBObject>
+
+/**
+ *
+ */
++ (NSArray *)dbobjectSelectAllForDocument:(CZDocument *)document;
+
+@end

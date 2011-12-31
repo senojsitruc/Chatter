@@ -1,0 +1,35 @@
+//
+//  FcpFile+DBObject.h
+//  ScriptSync
+//
+//  Created by Curtis Jones on 2010.10.13.
+//  Copyright 2010 Nexidia, Inc. All rights reserved.
+//
+
+#import <Cocoa/Cocoa.h>
+#import "DBObject.h"
+#import "FcpFile.h"
+
+@interface FcpFile (DBObject)
+
+/**
+ *
+ */
+- (BOOL)dbobjectInsert;
+
+/**
+ *
+ */
+- (BOOL)dbobjectUpdate;
+
+/**
+ *
+ */
+- (BOOL)dbobjectDelete;
+
+/**
+ *
+ */
++ (NSArray *)dbobjectSelectAllForProject:(FcpProject *)project;
+
+@end

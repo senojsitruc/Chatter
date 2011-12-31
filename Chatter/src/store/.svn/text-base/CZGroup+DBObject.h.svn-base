@@ -1,0 +1,27 @@
+//
+//  CZGroup.h
+//  ScriptSync
+//
+//  Created by Curtis Jones on 2010.09.15.
+//  Copyright 2010 Nexidia, Inc. All rights reserved.
+//
+
+#import <Cocoa/Cocoa.h>
+#import "CZGroup.h"
+#import "DBObject.h"
+
+@class CZDocument;
+
+@interface CZGroup (DBObject) <DBObject>
+
+/**
+ *
+ */
++ (NSArray *)dbobjectSelectAllForDocument:(CZDocument *)document;
+
+/**
+ * The parent can be either a CZGroup or a CZDocument.
+ */
++ (CZGroup *)dbobjectSelectForName:(NSString *)name inParent:(NSObject *)parent;
+
+@end

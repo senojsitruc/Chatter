@@ -1,0 +1,7 @@
+//
+// Prefix header for all source files of the 'AIM Importer' target in the 'AIM Importer' project
+//
+
+#ifdef __OBJC__
+	#import <Cocoa/Cocoa.h>
+#endif

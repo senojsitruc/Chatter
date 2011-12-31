@@ -1,0 +1,38 @@
+//
+//  FcpMetadata+DBObject.h
+//  ScriptSync
+//
+//  Created by Curtis Jones on 2011.03.09.
+//  Copyright 2011 Nexidia, Inc. All rights reserved.
+//
+
+#import <Foundation/Foundation.h>
+#import "CZMetadata.h"
+#import "FcpMetadata.h"
+#import "DBObject.h"
+
+@class FcpProject;
+
+@interface FcpMetadata (DBObject)
+
+/**
+ *
+ */
+- (BOOL)dbobjectInsert;
+
+/**
+ *
+ */
+- (BOOL)dbobjectUpdate;
+
+/**
+ *
+ */
+- (BOOL)dbobjectDelete;
+
+/**
+ *
+ */
++ (NSArray *)dbobjectSelectAllForParent:(FcpObject *)parent;
+
+@end

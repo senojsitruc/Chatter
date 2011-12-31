@@ -1,0 +1,173 @@
+[RELEASE 1.0.0 "Alabama"]
+
+	Insane memory leak while the application sits idle.
+
+	Spotify
+		Adapt it's dark theme.
+		Light text.
+		Dark background.
+		Replace the group/sort buttons with tabs.
+
+	Spotlight
+		Is causing stack corruption. Run loop related maybe?
+
+	Interface
+		Spotify-inspired dark background and tabbed options above the messages view.
+
+	Timestamps
+		Session timestamps should be the time at which the conversation began.
+		Source timestamps should be the last-mod-time of the source file.
+
+	Plugins
+		Optionally let service importer plugins subclass "ServiceImporter" (AND adopt the protocol,
+			which is the one we actually care about), which can provide facilities for loading a .plist
+			configuration file that includes supported content types, kinds, type codes, file extensions
+			and search paths (so that they don't have to be hard-coded.
+		Stub in and disable some importers for the as-yet-unsupported chat clients.ma
+
+	Credits
+		Special thanks to:
+			Jenny Beaird (jennybeaird.com) - artwork
+			Jeremy Jones - testing and feedback
+
+	Website
+		Add screenshots and descriptions for each. Maybe visually annotate the screenshots to emphasize
+			the particular feature when appropriate?
+
+	Icons
+		Employ Jenny's assistance with the application, toolbar and preference icons.
+
+	Distribute
+		Start distributing the application on the web site and list it in:
+			macupdate.com
+			versiontracker.com
+			freshmeat.net
+			freemacware.com
+			bestmacsoftware.org or bestfreesoftwarelist.com
+			freewareosx.com
+		And notify some news sites:
+			macnn.com
+			tuaw.com
+
+
+
+
+
+[RELEASE 1.1]
+
+	Command Line
+		Import data into the Chatter database via a command line program. Check to make sure that 
+			Chatter.app is not running.
+		Export data from the Chatter database based on accepting a query from the command line. Check to
+			make sure that Chatter.app is not running.
+		Parsing tool that can be fed files/directories and transcodes the chat logs. One of the 
+			supported formats should be an easy-to-parse (tabbed?) format. Optionally output to stdout.
+			Optionally output timestamp, screenname, message, source.
+
+	App Store
+		Verify purchase receipt.
+
+	Message
+		Delete conversation via right-click -> "Delete conversation..." with a confirmation dialog.
+
+	Conversation
+		Save / Export
+		Search
+		Delete conversation via right-click -> "Delete conversation..." with a confirmation dialog.
+
+	Sources
+		Instead of just storing the file path of a source, also store the file ref, so that if the file
+			moves, we can still find it; and we thus won't end up with duplicates. FSRef. QA-1350
+
+	Importers
+		Pidgin / GAIM
+		Skype
+		CSV
+		Messenger
+		Google Talk API (?)
+		ICQ (old and new)
+		Facebook
+		uTorrent / uChat
+
+	Import
+		Filter duplicates. Consider specifically the case of one side of a conversation taking place on
+			multiple computers. Both computers are logged in for some/all of the chat, but the user has
+			moved from one to the other (maybe from work to home?). Try not to make assumptions about
+			clock synchronization. Consider that the user may move between machines multiple times. We'll
+			likely have to employ some edit graphs to find the right combination of messages to retain.
+		Automatic updates. Use file system events to update the database. Let the user define which 
+			folders he wants us to watch.
+
+	Person
+		Associate a person with an Address Book record. We can use this association to get the user
+			picture. Otherwise, we could look through the Address Book for one of the accounts, by
+			screenname, and use that as the picture. ABPickerCreate(). -[ABPerson imageData]
+		Show a badge on the far-right of each buddy row that indicates the number of messages from/to
+			the buddy (or person). We'll definitely need to rely on the database to do these counts for
+			us. Badge counts should reflect search result counts when a search is being  performed.
+
+	Status text should reflect the visible values, not the total values. When only a subset of the
+		data is visible (due to a search), then the status text should reflect that.
+
+	Growl Support
+		"Imported xxx new chat messages." Do this after manual imports as well as automatic imports
+		from watching for changes in designated directories.
+
+	Update
+		Check for updates. Automatically at startup?
+		Sparkle (?)
+
+	Preferences
+		Automatically check for updates.
+		Message bubble color
+		Message text color
+		No buddy selection: display all messages or display no messages
+		Growl
+		Number of messages to load per block (default = 100)
+		Configure kMDItemContentType / file extension mappings to importers.
+		Selectively enable/disable plugins in preferences.
+
+	Hide Buddies / People
+		Right-click -> hide. Right-click the table to reveal hidden.
+
+	Clickable links in chat messages.
+		Make this a preference?
+
+
+
+
+
+[OTHER]
+
+	Facebook
+		Log into Facebook in order to obtain profile pics and real names to go along with chat logs
+		that only include a user id.
+
+	Share
+		Send message / conversation / search results via email. This might just be an exporter plugin.
+
+	iCloud
+		Sync message archive to other machines
+
+	iOS app
+
+	Word Stats
+		Top 500 words listed by popularity. Right-click to export.
+		Word use on a per-account/person basis.
+
+	Undo
+
+	Document-based design
+
+	AppleScript support
+		Allow users to write AppleScripts to access the data in Chatter
+
+	Import
+		Multi-threaded parsers. Use GCD. Take a block of files to import and hand it to a job. It
+			wouldn't need to do much more than parse and construct the objects. The actual database
+			insertions would occur outside the thread. The block result would be a set of messages and
+			source associations.
+		Move indexing (ie, "messageword") to a separate thread.
+
+	Facebook
+		Can we download one's Facebook chat logs? Investigate.

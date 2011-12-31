@@ -1,0 +1,2522 @@
+//
+//  CZDocument.m
+//  ScriptSync
+//
+//  Created by Curtis Jones on 2010.09.17.
+//  Copyright 2010 Nexidia, Inc. All rights reserved.
+//
+
+#import "CZDocument.h"
+#import "CZDocument+DBObject.h"
+#import "CZElement+DBObject.h"
+#import "CZGroup+DBObject.h"
+#import "CZMedia+DBObject.h"
+#import "CZNote+DBObject.h"
+#import "CZParagraphStyle+DBObject.h"
+#import "CZPreference+DBObject.h"
+#import "CZRoughCut+DBObject.h"
+#import "CZRoughCutSegment+DBObject.h"
+#import "CZScript+DBObject.h"
+#import "CZScriptStyle+DBObject.h"
+#import "CZScriptTextStorage.h"
+#import "CZSlate+DBObject.h"
+#import "CZSpan+DBObject.h"
+#import "CZSpanLabel+DBObject.h"
+#import "CZSyncPoint+DBObject.h"
+#import "CZTake+DBObject.h"
+#import "FcpProject+DBObject.h"
+#import "DBConnection.h"
+#import "SQLiteDBConnection.h"
+#import "FSNotifier.h"
+#import "Foundation+NGTenSixCompatibility.h"
+#import "Easy.h"
+
+@implementation CZDocument (DBObjectPrivate)
+
+#pragma mark -
+#pragma mark Database Management
+
+/**
+ * Copies the default database from the application bundle to the document bundle if it doesn't
+ * already exist. This fails if the document bundle directory doesn't exist, as well.
+ *
+ */
+- (BOOL)createDatabase
+{
+	BOOL isDir;
+	NSString *dbdst, *dbsrc;
+	NSError *error;
+	NSFileManager *fileManager = [[[NSFileManager alloc] init] autorelease];
+	
+	NSString *dbPath = self.tmppath;
+	
+	// fail if the path for this document is nil or zero-length
+	if (0 == [dbPath length]) {
+		NSLog(@"%s.. no document path specified.", __PRETTY_FUNCTION__);
+		return FALSE;
+	}
+	
+	// fail if the document directory does not exist and we cannot create it
+	if (FALSE == [fileManager fileExistsAtPath:dbPath isDirectory:&isDir]) {
+		NSLog(@"%s.. document bundle does not exist at '%@'", __PRETTY_FUNCTION__, dbPath);
+		return FALSE;
+	}
+	
+	// or if it happens to be a file instead of a directory
+	else if (FALSE == isDir) {
+		NSLog(@"%s.. document path is not a directory at '%@'", __PRETTY_FUNCTION__, dbPath);
+		return FALSE;
+	}
+	
+	// create the source and destination paths for the database
+	dbdst = [dbPath stringByAppendingPathComponent:@"default.db"];
+	dbsrc = [[NSBundle mainBundle] pathForResource:@"default" ofType:@"db"];
+	
+	// fail if the destination path for the database already exists
+	if (TRUE == [fileManager fileExistsAtPath:dbdst]) {
+		NSLog(@"%s.. the database file already exists for this document at '%@'", __PRETTY_FUNCTION__, dbdst);
+		return FALSE;
+	}
+	
+	// copy the default database from the application bundle to the document bundle
+	if (FALSE == [fileManager copyItemAtPath:dbsrc toPath:dbdst error:&error]) {
+		NSLog(@"%s.. failed to copy '%@' to '%@' because %@", __PRETTY_FUNCTION__, dbsrc, dbdst, [error localizedDescription]);
+		return FALSE;
+	}
+	
+	return TRUE;
+}
+
+/**
+ * Attemps to connect to the database associated with this document (via the mPath member). The
+ * database should be named "default.db". This'll throw an exception if the document is already 
+ * connected to a database. And it'll fail (less forcefully) if the path is nil or invalid or any
+ * one of a number of other things. After success, the database connection object is handed over to
+ * the document for safe keeping.
+ *
+ */
+- (BOOL)connectToDatabase
+{
+	DBConnection *dbconn = nil;
+	
+	NSString *dbPath = self.tmppath;
+	
+	// fail if the document is already connected to a database
+	if (mDbConn != nil)
+		@throw [NSException exceptionWithName:CZExceptionNoDbConnection reason:@"This document is already connected to a database." userInfo:nil];
+	
+	// fail if the path for this document is nil or zero-length
+	if (0 == [dbPath length]) {
+		NSLog(@"%s.. no document path specified.", __PRETTY_FUNCTION__);
+		return FALSE;
+	}
+	
+	// create a new database connection object
+	dbconn = [[SQLiteDBConnection alloc] initWithFileName:[dbPath stringByAppendingPathComponent:@"default.db"]];
+	
+	// attempt to connect to the database
+	if (FALSE == [dbconn connect]) {
+		NSLog(@"%s.. failed to connect", __PRETTY_FUNCTION__);
+		[dbconn release];
+		return FALSE;
+	}
+	
+	// assign the connected database connection object to the document
+	self.dbconnection = dbconn;
+	
+	// we don't need the database connection here any longer
+	[dbconn release];
+	
+	// tell the peepz that everything is good
+	NSLog(@"%s.. connected to database in %@", __PRETTY_FUNCTION__, dbPath);
+	
+	// yee-ha
+	return TRUE;
+}
+
+/**
+ * Attempts to disconnect from the database associated with this document and remove's the 
+ * document's database connection object. This'll throw an exception if the document is not already
+ * connected to a database. Throwing an exception in this case might be a bit over-kill, but we can
+ * adjust this later if that turns out to be the case.
+ *
+ */
+- (BOOL)disconnectFromDatabase
+{
+	// fail if the document is not already connected to a database
+	if (mDbConn == nil)
+		@throw [NSException exceptionWithName:CZExceptionNoDbConnection reason:@"This document is not connected to a database." userInfo:nil];
+	
+	// attempt to disconnect from the database
+	if (FALSE == [mDbConn disconnect]) {
+		NSLog(@"%s.. failed to disconnect?!", __PRETTY_FUNCTION__);
+		return FALSE;
+	}
+	
+	// clear out the document's database connection object
+	self.dbconnection = nil;
+	
+	// yee-ha
+	return TRUE;
+}
+
+
+
+
+
+#pragma mark -
+#pragma mark CZSaveable
+
+/**
+ * Data Model Dependency Graph
+ *
+ *   preference ->
+ *
+ *   group ->
+ *   media -> group
+ *
+ *   paragraph style ->
+ *   script style -> paragraph style
+ *
+ *   script -> element, group, script style
+ *   element -> script
+ *   note -> element
+ *   slate -> script
+ *   take -> slate, media
+ *   span -> take
+ *   span label -> 
+ *   sync point -> take, element
+ *
+ *   roughcut ->
+ *   roughcut segment -> roughcut, media
+ *
+ * We can't iterate directly over the dictionaries because any insert will result in a modification
+ * to both the "tmp" dictionary and the "byid" dictionary.
+ *
+ */
+- (BOOL)__save
+{
+	__block NSUInteger totalObjectCount = 0;
+	__block NSUInteger totalObjectsSaved = 0;
+	__block NSUInteger notifyBlockSize = 1;
+	
+	__block void (^saveProgress)(double, NSString*) = (^ (double progress, NSString *message) {
+		NSLog(@"  %f | count=%u, saved=%u | %@", progress, totalObjectCount, totalObjectsSaved, message);
+		NSDictionary *userInfo = [NSDictionary dictionaryWithObjectsAndKeys:
+															[NSNumber numberWithDouble:progress], CZKeySaveProgress,
+															message, CZKeySaveMessage, nil];
+		
+		[Easy postNotification:CZNotificationSaveProgress object:self userInfo:userInfo];
+	});
+	
+	void (^saveObjects)(NSArray*, NSString*) = (^ (NSArray *objects, NSString *type) {
+		saveProgress(((double)totalObjectsSaved / (double)totalObjectCount), type);
+		
+		for (id<CZSaveable> object in objects) {
+			if (FALSE == [object save])
+				@throw [NSException exceptionWithName:@"CZExceptionSaveFailed" reason:[NSString stringWithFormat:@"Failed to %@::save()", NSStringFromClass([object class])] userInfo:nil];
+			
+			totalObjectsSaved += 1;
+			
+			if (0 == (totalObjectsSaved % notifyBlockSize))
+				saveProgress(((double)totalObjectsSaved / (double)totalObjectCount), type);
+		}
+	});
+	
+	// sum all of the objects that define this document so that we know the total amount of work we
+	// need to complete in saving the document.
+	totalObjectCount += [mTmpPreferences count] + [mPreferencesById count];
+	totalObjectCount += [mTmpGroups count] + [mGroupsById count];
+	totalObjectCount += [mTmpMedia count] + [mMediaById count];
+	totalObjectCount += [mTmpParagraphStyles count] + [mParagraphStylesById count];
+	totalObjectCount += [mTmpScriptStyles count] + [mScriptStylesById count];
+	totalObjectCount += [mTmpScripts count] + [mScriptsById count];
+	totalObjectCount += [mTmpElements count] + [mElementsById count] + [mTmpElements count] + [mElementsById count] + [mTmpElements count] + [mScriptsById count];
+	totalObjectCount += [mTmpNotes count] + [mNotesById count];
+	totalObjectCount += [mTmpSlates count] + [mSlatesById count];
+	totalObjectCount += [mTmpTakes count] + [mTakesById count];
+	totalObjectCount += [mTmpSpans count] + [mSpansById count];
+	totalObjectCount += [mTmpSpanLabels count] + [mSpanLabelsById count];
+	totalObjectCount += [mTmpPoints count] + [mPointsById count];
+	totalObjectCount += [mTmpRoughCuts count] + [mRoughCutsById count];
+	totalObjectCount += [mTmpSegments count] + [mSegmentsById count];
+	
+	// the notify block size specifies the resolution with which save progress notifications will 
+	// occur. we're shooting for approximately one hundred per save.
+	if (totalObjectCount > 100)
+		notifyBlockSize = totalObjectCount / 100;
+	
+	// TODO: catch exceptions and rollback the transaction
+	@try
+	{
+		[mDbConn beginTransaction];
+		
+		// indicate that the save process is starting
+		saveProgress(0., @"");
+		
+		saveObjects([mTmpPreferences allValues], @"preferences");
+		saveObjects([mPreferencesById allValues], @"preferences");
+		
+		// groups
+		saveObjects([mTmpGroups allValues], @"groups");
+		saveObjects([mGroupsById allValues], @"groups");
+		
+		// media
+		saveObjects([mTmpMedia allValues], @"media");
+		saveObjects([mMediaById allValues], @"media");
+		
+		// paragraph styles
+		saveObjects([mTmpParagraphStyles allValues], @"paragraph styles");
+		saveObjects([mParagraphStylesById allValues], @"paragraph styles");
+		
+		// script styles
+		saveObjects([mTmpScriptStyles allValues], @"script styles");
+		saveObjects([mScriptStylesById allValues], @"script styles");
+		
+		// scripts
+		saveObjects([mTmpScripts allValues], @"scripts-1a");
+		saveObjects([mScriptsById allValues], @"scripts-1b");
+		
+		// elements
+		//
+		// this is a multi-step process due to the doubly-linked list of elements. and following the
+		// 2nd iteration of element updates, the scripts need to be updated again with their heads/tails.
+		//
+		saveObjects([mTmpElements allValues], @"elements-1a");
+		saveObjects([mElementsById allValues], @"elements-1b");
+		saveObjects([mElementsById allValues], @"elements-1c");
+		saveObjects([mScriptsById allValues], @"scripts-2a");
+		
+		// notes
+		saveObjects([mTmpNotes allValues], @"notes");
+		saveObjects([mNotesById allValues], @"notes");
+		
+		// slates
+		saveObjects([mTmpSlates allValues], @"slates");
+		saveObjects([mSlatesById allValues], @"slates");
+		
+		// takes
+		saveObjects([mTmpTakes allValues], @"takes");
+		saveObjects([mTakesById allValues], @"takes");
+		
+		// spans
+		saveObjects([mTmpSpans allValues], @"spans");
+		saveObjects([mSpansById allValues], @"spans");
+		
+		// span labels
+		saveObjects([mTmpSpanLabels allValues], @"span labels");
+		saveObjects([mSpanLabelsById allValues], @"span labels");
+		
+		// sync points
+		saveObjects([mTmpPoints allValues], @"sync points");
+		saveObjects([mPointsById allValues], @"sync points");
+		
+		// roughcuts
+		saveObjects([mTmpRoughCuts allValues], @"roughcuts");
+		saveObjects([mRoughCutsById allValues], @"roughcuts");
+		
+		// roughcut segments
+		saveObjects([mTmpSegments allValues], @"roughcut segments");
+		saveObjects([mSegmentsById allValues], @"roughtcut segments");
+		
+		// indicate that the save process has completed
+		saveProgress(1., @"");
+		
+		[mDbConn commitTransaction];
+	}
+	@catch (NSException *exception) {
+		[mDbConn rollbackTransaction];
+		NSLog(@"%s.. Caught %@: %@", __PRETTY_FUNCTION__, [exception name], [exception reason]);
+	}
+	
+	return TRUE;
+}
+
+
+
+
+
+#pragma mark -
+#pragma mark Elements
+
+/**
+ * Loads all of the elements found in this document's database.
+ *
+ */
+- (void)loadElements
+{
+	[CZElement dbobjectSelectAllForDocument:self];
+	NSLog(@"%s.. loaded %u element(s)", __PRETTY_FUNCTION__, [mElementsById count]);
+}
+
+/**
+ *
+ *
+ */
+- (CZElement *)elementWithId:(NSUInteger)elementId
+{
+	return [mElementsById objectForKey:[CZObject objectWithDatabaseId:elementId]];
+}
+
+/**
+ *
+ *
+ */
+- (void)__addElement:(CZElement *)element
+{
+	if (element.document != self)
+		@throw [NSException exceptionWithName:@"CZExceptionInvalidDocument" reason:@"Null or invalid document for object." userInfo:nil];
+	
+	if (element.databaseId != 0)
+		[mElementsById setObject:element forKey:element];
+	else
+		[mTmpElements setObject:element forKey:element];
+}
+
+/**
+ *
+ *
+ */
+- (void)__removeElement:(CZElement *)element
+{
+	if (element.document != self)
+		@throw [NSException exceptionWithName:@"CZExceptionInvalidDocument" reason:@"Null or invalid document for object." userInfo:nil];
+	
+	if (element.databaseId != 0) {
+		if (element.deleted == 0)
+			element.deleted = 1;
+		else
+			[mElementsById removeObjectForKey:element];
+	}
+	else
+		[mTmpElements removeObjectForKey:element];
+}
+
+/**
+ *
+ *
+ */
+- (void)__addCachedElement:(CZElement *)element
+{
+	if (element.databaseId == 0)
+		@throw [NSException exceptionWithName:@"CZExceptionNoDatabaseId" reason:@"Database id is zero" userInfo:nil];
+	
+	[mElementCache setObject:element forKey:element];
+}
+
+/**
+ *
+ *
+ */
+- (void)__removeCachedElement:(CZElement *)element
+{
+	if (element.databaseId == 0)
+		@throw [NSException exceptionWithName:@"CZExceptionNoDatabaseId" reason:@"Database id is zero" userInfo:nil];
+	
+	[mElementCache removeObjectForKey:element];
+}
+
+/**
+ *
+ *
+ */
+- (CZElement *)__getCachedElementForElement:(CZElement *)element
+{
+	if (element.databaseId == 0)
+		@throw [NSException exceptionWithName:@"CZExceptionNoDatabaseId" reason:@"Database id is zero" userInfo:nil];
+	
+	return [mElementCache objectForKey:element];
+}
+
+
+
+
+
+#pragma mark -
+#pragma mark Groups
+
+/**
+ * Loads all of the groups found in this document's database.
+ *
+ */
+- (void)loadGroups
+{
+	[CZGroup dbobjectSelectAllForDocument:self];
+	NSLog(@"%s.. loaded %u group(s)", __PRETTY_FUNCTION__, [mGroupsById count]);
+}
+
+/**
+ *
+ *
+ */
+- (NSArray *)selectAllRootItems
+{
+	NSMutableArray *items = [NSMutableArray array];
+	
+	for (CZGroup *group in [mGroupsById allValues]) {
+		if (group.deleted == 0 && group.parentGroupId == 0 && group.parentGroup == nil)
+			[items addObject:group];
+	}
+	
+	for (CZGroup *group in [mTmpGroups allValues]) {
+		if (group.deleted == 0 && group.parentGroupId == 0 && group.parentGroup == nil)
+			[items addObject:group];
+	}
+	
+	for (CZMedia *media in [mMediaById allValues]) {
+		if (media.deleted == 0 && media.parentGroupId == 0 && media.parentGroup == nil)
+			[items addObject:media];
+	}
+	
+	for (CZMedia *media in [mTmpMedia allValues]) {
+		if (media.deleted == 0 && media.parentGroupId == 0 && media.parentGroup == nil)
+			[items addObject:media];
+	}
+	
+	for (CZScript *script in [mScriptsById allValues]) {
+		if (script.deleted == 0 && script.parentGroupId == 0 && script.parentGroup == nil)
+			[items addObject:script];
+	}
+	
+	for (CZScript *script in [mTmpScripts allValues]) {
+		if (script.deleted == 0 && script.parentGroupId == 0 && script.parentGroup == nil)
+			[items addObject:script];
+	}
+	
+	for (FcpProject *project in [mProjectsById allValues]) {
+		if (project.deleted == 0 && project.parentGroupId == 0 && project.parentGroup == nil)
+			[items addObject:project];
+	}
+	
+	return items;
+}
+
+/**
+ *
+ *
+ */
+- (CZGroup *)groupWithId:(NSUInteger)groupId
+{
+	return [mGroupsById objectForKey:[CZObject objectWithDatabaseId:groupId]];
+}
+
+/**
+ *
+ *
+ */
+- (void)__addGroup:(CZGroup *)group
+{
+	if (group.document != self)
+		@throw [NSException exceptionWithName:@"CZExceptionInvalidDocument" reason:@"Null or invalid document for object." userInfo:nil];
+	
+	if (group.databaseId != 0)
+		[mGroupsById setObject:group forKey:group];
+	else
+		[mTmpGroups setObject:group forKey:group];
+	
+	[Easy postNotification:CZNotificationGroupInserted object:self userInfo:[NSDictionary dictionaryWithObjectsAndKeys:group, CZKeyGroup, nil]];
+}
+
+/**
+ *
+ *
+ */
+- (void)__removeGroup:(CZGroup *)group
+{
+	if (group.document != self)
+		@throw [NSException exceptionWithName:@"CZExceptionInvalidDocument" reason:@"Null or invalid document for object." userInfo:nil];
+	
+	if (group.databaseId != 0) {
+		if (group.deleted == 0)
+			group.deleted = 1;
+		else
+			[mGroupsById removeObjectForKey:group];
+	}
+	else
+		[mTmpGroups removeObjectForKey:group];
+	
+	[Easy postNotification:CZNotificationGroupDeleted object:self userInfo:[NSDictionary dictionaryWithObjectsAndKeys:group, CZKeyGroup, nil]];
+}
+
+/**
+ *
+ *
+ */
+- (void)__addCachedGroup:(CZGroup *)group
+{
+	if (group.databaseId == 0)
+		@throw [NSException exceptionWithName:@"CZExceptionNoDatabaseId" reason:@"Database id is zero" userInfo:nil];
+	
+	[mGroupCache setObject:group forKey:group];
+}
+
+/**
+ *
+ *
+ */
+- (void)__removeCachedGroup:(CZGroup *)group
+{
+	if (group.databaseId == 0)
+		@throw [NSException exceptionWithName:@"CZExceptionNoDatabaseId" reason:@"Database id is zero" userInfo:nil];
+	
+	[mGroupCache removeObjectForKey:group];
+}
+
+/**
+ *
+ *
+ */
+- (CZGroup *)__getCachedGroupForGroup:(CZGroup *)group
+{
+	if (group.databaseId == 0)
+		@throw [NSException exceptionWithName:@"CZExceptionNoDatabaseId" reason:@"Database id is zero" userInfo:nil];
+	
+	return [mGroupCache objectForKey:group];
+}
+
+
+
+
+
+#pragma mark -
+#pragma mark Notes
+
+/**
+ *
+ *
+ */
+- (void)loadNotes
+{
+	[CZNote dbobjectSelectAllForDocument:self];
+}
+
+/**
+ *
+ *
+ */
+- (CZNote *)noteWithId:(NSUInteger)noteId
+{
+	return [mNotesById objectForKey:[CZObject objectWithDatabaseId:noteId]];
+}
+
+/**
+ *
+ *
+ */
+- (NSArray *)__notesInElement:(CZElement *)element
+{
+	NSUInteger elementId;
+	NSMutableArray *notes = [NSMutableArray array];
+	
+	if (0 != (elementId = element.databaseId)) {
+		for (CZNote *note in [mNotesById allValues]) {
+			if (!note.deleted && elementId == note.elementId)
+				[notes addObject:note];
+		}
+		
+		for (CZNote *note in [mTmpNotes allValues]) {
+			if (elementId == note.elementId)
+				[notes addObject:note];
+			else if (element == note.element)
+				[notes addObject:note];
+		}
+	}
+	else {
+		for (CZNote *note in [mTmpNotes allValues]) {
+			if (element == note.element)
+				[notes addObject:note];
+		}
+	}
+	
+	return notes;
+}
+
+/**
+ *
+ *
+ */
+- (NSArray *)__notesInScript:(CZScript *)script
+{
+	NSMutableArray *notes = [NSMutableArray array];
+	
+	for (CZNote *note in [mNotesById allValues]) {
+		if (!note.deleted && script == note.element.script)
+			[notes addObject:note];
+	}
+	
+	for (CZNote *note in [mTmpNotes allValues]) {
+		if (script == note.element.script)
+			[notes addObject:note];
+	}
+	
+	return notes;
+}
+
+/**
+ *
+ *
+ */
+- (void)__addNote:(CZNote *)note
+{
+	if (note.document != self)
+		@throw [NSException exceptionWithName:@"CZExceptionInvalidDocument" reason:@"Null or invalid document for object" userInfo:nil];
+	
+	if (note.databaseId != 0)
+		[mNotesById setObject:note forKey:note];
+	else
+		[mTmpNotes setObject:note forKey:note];
+	
+	[Easy postNotification:CZNotificationNoteInserted object:self userInfo:[NSDictionary dictionaryWithObjectsAndKeys:note, CZKeyNote, nil]];
+}
+
+/**
+ *
+ *
+ */
+- (void)__removeNote:(CZNote *)note
+{
+	if (note.document != self)
+		@throw [NSException exceptionWithName:@"CZExceptionInvalidDocument" reason:@"Null or invalid document for object" userInfo:nil];
+	
+	if (note.databaseId != 0) {
+		if (note.deleted == 0)
+			note.deleted = 1;
+		else
+			[mNotesById removeObjectForKey:note];
+	}
+	else
+		[mTmpNotes removeObjectForKey:note];
+	
+	[Easy postNotification:CZNotificationNoteDeleted object:self userInfo:[NSDictionary dictionaryWithObjectsAndKeys:note, CZKeyNote, nil]];
+}
+
+/**
+ *
+ *
+ */
+- (void)__addCachedNote:(CZNote *)note
+{
+	if (note.databaseId == 0)
+		@throw [NSException exceptionWithName:@"CZExceptionNoDatabaseId" reason:@"Database id is zero" userInfo:nil];
+	
+	[mNoteCache setObject:note forKey:note];
+}
+
+/**
+ *
+ *
+ */
+- (void)__removeCachedNote:(CZNote *)note
+{
+	if (note.databaseId == 0)
+		@throw [NSException exceptionWithName:@"CZExceptionNoDatabaseId" reason:@"Database id is zero" userInfo:nil];
+	
+	[mNoteCache removeObjectForKey:note];
+}
+
+/**
+ *
+ *
+ */
+- (CZNote *)__getCachedNoteForNote:(CZNote *)note
+{
+	if (note.databaseId == 0)
+		@throw [NSException exceptionWithName:@"CZExceptionNoDatabaseId" reason:@"Database id is zero" userInfo:nil];
+	
+	return [mNoteCache objectForKey:note];
+}
+
+
+
+
+
+#pragma mark -
+#pragma mark Preferences
+
+/**
+ *
+ *
+ */
+- (void)loadPreferences
+{
+	[CZPreference dbobjectSelectAllForDocument:self];
+}
+
+/**
+ *
+ *
+ */
+- (CZPreference *)preferenceForName:(NSString *)name
+{
+	return [mPreferencesByName objectForKey:name];
+}
+
+/**
+ *
+ *
+ */
+- (NSString *)preferenceStringForName:(NSString *)name
+{
+	return [self preferenceForName:name].stringValue;
+}
+
+/**
+ *
+ *
+ */
+- (void)setPreferenceStringValue:(NSString *)value forName:(NSString *)name
+{
+	CZPreference *preference = [self preferenceForName:name];
+	
+	if (preference == nil) {
+		preference = [CZPreference preference];
+		preference.name = name;
+		[self __addPreference:preference];
+	}
+	
+	preference.stringValue = value;
+}
+
+/**
+ *
+ *
+ */
+- (NSData *)preferenceDataForName:(NSString *)name
+{
+	return [self preferenceForName:name].dataValue;
+}
+
+/**
+ *
+ *
+ */
+- (void)setPreferenceDataValue:(NSData *)value forName:(NSString *)name
+{
+	CZPreference *preference = [self preferenceForName:name];
+	
+	if (preference == nil) {
+		preference = [CZPreference preference];
+		preference.name = name;
+		[self __addPreference:preference];
+	}
+	
+	preference.dataValue = value;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)__addPreference:(CZPreference *)preference
+{
+	if (preference.document != self)
+		@throw [NSException exceptionWithName:@"CZExceptionInvalidDocument" reason:@"Null or invalid document for object" userInfo:nil];
+	
+	if (preference.databaseId != 0)
+		[mPreferencesById setObject:preference forKey:preference];
+	else
+		[mTmpPreferences setObject:preference forKey:preference];
+	
+	[mPreferencesByName setObject:preference forKey:preference.name];
+	
+	return TRUE;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)__removePreference:(CZPreference *)preference
+{
+	if (preference.document != self)
+		@throw [NSException exceptionWithName:@"CZExceptionInvalidDocument" reason:@"Null or invalid document for object" userInfo:nil];
+	
+	if (preference.databaseId != 0) {
+		if (preference.deleted == 0)
+			preference.deleted = 1;
+		else
+			[mPreferencesById removeObjectForKey:preference];
+	}
+	else
+		[mTmpPreferences removeObjectForKey:preference];
+	
+	[mPreferencesByName removeObjectForKey:preference.name];
+	
+	return TRUE;
+}
+
+/**
+ *
+ *
+ */
+- (void)__addCachedPreference:(CZPreference *)preference
+{
+	if (preference.databaseId == 0)
+		@throw [NSException exceptionWithName:@"CZExceptionNoDatabaseId" reason:@"Database id is zero" userInfo:nil];
+	
+	[mPreferenceCache setObject:preference forKey:preference];
+}
+
+/**
+ *
+ *
+ */
+- (void)__removeCachedPreference:(CZPreference *)preference
+{
+	if (preference.databaseId == 0)
+		@throw [NSException exceptionWithName:@"CZExceptionNoDatabaseId" reason:@"Database id is zero" userInfo:nil];
+	
+	[mPreferenceCache removeObjectForKey:preference];
+}
+
+/**
+ *
+ *
+ */
+- (CZPreference *)__getCachedPreferenceForPreference:(CZPreference *)preference
+{
+	if (preference.databaseId == 0)
+		@throw [NSException exceptionWithName:@"CZExceptionNoDatabaseId" reason:@"Database id is zero" userInfo:nil];
+	
+	return [mPreferenceCache objectForKey:preference];
+}
+
+
+
+
+
+#pragma mark -
+#pragma mark FCP Projects
+
+/**
+ * Loads all of the projects found in this document's database into the projects array of the document.
+ *
+ */
+- (void)loadProjects
+{
+	NSArray *projects = [FcpProject dbobjectSelectAllForDocument:self];
+	
+	for (FcpProject *project in projects) {
+		[self __addProject:project];
+	}
+	
+	NSLog(@"%s.. loaded %u project(s)", __PRETTY_FUNCTION__, [mProjectsById count]);
+}
+
+/**
+ *
+ *
+ */
+- (FcpProject *)projectWithId:(NSUInteger)projectId
+{
+	return [mProjectsById objectForKey:[CZObject objectWithDatabaseId:projectId]];
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)__addProject:(FcpProject *)project
+{
+	if (project.document != self)
+		@throw [NSException exceptionWithName:@"CZExceptionInvalidDocument" reason:@"Null or invalid document for object." userInfo:nil];
+	
+	/*
+	// if the project isn't already in the database, add it
+	if (project.databaseId == 0) {
+		if (FALSE == [project dbobjectInsert]) {
+			NSLog(@"%s.. failed to add project to the database", __PRETTY_FUNCTION__);
+			return FALSE;
+		}
+	}
+	
+	// if we already have a project with that id in this document then something is tragically wrong
+	if (nil != [mProjectsById objectForKey:project]) {
+		NSLog(@"%s.. you can not add a project with an identical key", __PRETTY_FUNCTION__);
+		return FALSE;
+	}
+	*/
+	
+	[mProjectsById setObject:project forKey:project];
+	
+	// add a file system event notifier for this project
+	[[FSNotifier mainInstance] addObserverForPath:project.path target:self action:@selector(doNotifier:fcpprojectChanged:)];
+	
+	// notify
+	[Easy postNotification:CZNotificationProjectInserted object:self userInfo:[NSDictionary dictionaryWithObjectsAndKeys:project, CZKeyProject, nil]];
+	
+	return TRUE;
+}
+
+/**
+ *
+ *
+ */
+- (BOOL)__removeProject:(FcpProject *)project
+{
+	if (project.document != self)
+		@throw [NSException exceptionWithName:@"CZExceptionInvalidDocument" reason:@"Null or invalid document for object." userInfo:nil];
+	
+	// start by giving us an actual project, thank you
+	if (project == nil) {
+		NSLog(@"%s.. you can not remove a null project", __PRETTY_FUNCTION__);
+		return FALSE;
+	}
+	
+	// if the project has a database key then attempt to delete it from the database
+	if (project.databaseId != 0) {
+		if (FALSE == [project dbobjectDelete]) {
+			NSLog(@"%s.. failed to delete project with id = %u", __PRETTY_FUNCTION__, project.databaseId);
+			return FALSE;
+		}
+	}
+	
+	// remove the project from our cache
+	[mProjectsById removeObjectForKey:project];
+	
+	// remove the file system event notifier for this project
+	[[FSNotifier mainInstance] removeObserverForPath:project.path];
+	
+	return TRUE;
+}
+
+
+
+
+
+#pragma mark -
+#pragma mark Scripts
+
+/**
+ *
+ *
+ */
+- (NSArray *)scripts
+{
+	NSMutableArray *scripts = [NSMutableArray array];
+	
+	[scripts addObjectsFromArray:[mScriptsById allValues]];
+	[scripts addObjectsFromArray:[mTmpScripts allValues]];
+	
+	return scripts;
+}
+
+/**
+ * Loads all of the scripts found in this document's database.
+ *
+ */
+- (void)loadScripts
+{
+	[CZScript dbobjectSelectAllForDocument:self];
+	NSLog(@"%s.. loaded %u script(s)", __PRETTY_FUNCTION__, [mScriptsById count]);
+}
+
+/**
+ *
+ *
+ */
+- (CZScript *)scriptWithId:(NSUInteger)scriptId
+{
+	return [mScriptsById objectForKey:[CZObject objectWithDatabaseId:scriptId]];
+}
+
+/**
+ * We only notify about a new script for non-database-loaded scripts because in the case of scripts
+ * being loaded from the database, we still need to load into the script its elements.
+ *
+ */
+- (void)__addScript:(CZScript *)script
+{
+	if (script.document != self)
+		@throw [NSException exceptionWithName:@"CZExceptionInvalidDocument" reason:@"Null or invalid document for object." userInfo:nil];
+	
+	if (script.databaseId != 0)
+		[mScriptsById setObject:script forKey:script];
+	else {
+		[mTmpScripts setObject:script forKey:script];
+		[Easy postNotification:CZNotificationScriptInserted object:self userInfo:[NSDictionary dictionaryWithObjectsAndKeys:script, CZKeyScript, nil]];
+	}
+}
+
+/**
+ *
+ *
+ */
+- (void)__removeScript:(CZScript *)script
+{
+	if (script.document != self)
+		@throw [NSException exceptionWithName:@"CZExceptionInvalidDocument" reason:@"Null or invalid document for object." userInfo:nil];
+	
+	if (script.databaseId != 0) {
+		if (script.deleted == 0)
+			script.deleted = 1;
+		else
+			[mScriptsById removeObjectForKey:script];
+	}
+	else
+		[mTmpScripts removeObjectForKey:script];
+}
+
+/**
+ *
+ *
+ */
+- (void)__addCachedScript:(CZScript *)script
+{
+	if (script.databaseId == 0)
+		@throw [NSException exceptionWithName:@"CZExceptionNoDatabaseId" reason:@"Database id is zero" userInfo:nil];
+	
+	[mScriptCache setObject:script forKey:script];
+}
+
+/**
+ *
+ *
+ */
+- (void)__removeCachedScript:(CZScript *)script
+{
+	if (script.databaseId == 0)
+		@throw [NSException exceptionWithName:@"CZExceptionNoDatabaseId" reason:@"Database id is zero" userInfo:nil];
+	
+	[mScriptCache removeObjectForKey:script];
+}
+
+/**
+ *
+ *
+ */
+- (CZScript *)__getCachedScriptForScript:(CZScript *)script
+{
+	if (script.databaseId == 0)
+		@throw [NSException exceptionWithName:@"CZExceptionNoDatabaseId" reason:@"Database id is zero" userInfo:nil];
+	
+	return [mScriptCache objectForKey:script];
+}
+
+
+
+
+
+#pragma mark -
+#pragma mark Labels
+
+/**
+ * TODO: Curtis: Implement nameForLabel.
+ *
+ */
+- (NSString *)nameForLabel:(NSString *)label
+{
+	// for now we will just return the label name, fancy-like
+	return [label capitalizedString];
+}
+
+/**
+ * TODO: Curtis: Implement setName:forLabel:.
+ *
+ */
+- (void)setName:(NSString *)name forLabel:(NSString *)label
+{
+	
+}
+
+
+
+
+
+#pragma mark -
+#pragma mark Sync Points
+
+/**
+ * Loads all of the sync points found in this document's database.
+ *
+ */
+- (void)loadSyncPoints
+{
+	[CZSyncPoint dbobjectSelectAllForDocument:self];
+	NSLog(@"%s.. loaded %u sync point(s)", __PRETTY_FUNCTION__, [mPointsById count]);
+}
+
+/**
+ *
+ *
+ */
+- (CZSyncPoint *)syncPointWithId:(NSUInteger)syncPointId
+{
+	return [mPointsById objectForKey:[CZObject objectWithDatabaseId:syncPointId]];
+}
+
+/**
+ *
+ *
+ */
+- (void)__addSyncPoint:(CZSyncPoint *)syncPoint
+{
+	if (syncPoint.document != self)
+		@throw [NSException exceptionWithName:@"CZExceptionInvalidDocument" reason:@"Null or invalid document for object." userInfo:nil];
+	
+	if (syncPoint.databaseId != 0) {
+		[mPointsById setObject:syncPoint forKey:syncPoint];
+	}
+	else {
+		@synchronized (mTmpPoints) {
+			[mTmpPoints setObject:syncPoint forKey:syncPoint];
+		}
+	}
+}
+
+/**
+ *
+ *
+ */
+- (void)__removeSyncPoint:(CZSyncPoint *)syncPoint
+{
+	if (syncPoint.document != self)
+		@throw [NSException exceptionWithName:@"CZExceptionInvalidDocument" reason:@"Null or invalid document for object." userInfo:nil];
+	
+	if (syncPoint.databaseId != 0) {
+		if (syncPoint.deleted == 0)
+			syncPoint.deleted = 1;
+		else
+			[mPointsById removeObjectForKey:syncPoint];
+	}
+	else {
+		@synchronized (mTmpPoints) {
+			[mTmpPoints removeObjectForKey:syncPoint];
+		}
+	}
+}
+
+/**
+ *
+ *
+ */
+- (NSArray *)__syncPointsInElement:(CZElement *)element
+{
+	return element.points;
+	
+	/*
+	NSUInteger elementId = element.databaseId;
+	NSMutableArray *points = [NSMutableArray array];
+	NSArray *tmpPoints = nil;
+	
+	if (elementId != 0) {
+		for (CZSyncPoint *point in [mPointsById allValues]) {
+			if (point.elementId == elementId)
+				[points addObject:point];
+			else if (point.elementId == 0 && point.element == element)
+				[points addObject:point];
+		}
+	}
+	
+	@synchronized (mTmpPoints) {
+		tmpPoints = [mTmpPoints allValues];
+	}
+	
+	for (CZSyncPoint *point in tmpPoints) {
+		if (point.element == element)
+			[points addObject:point];
+	}
+	
+	return points;
+	*/
+}
+
+/**
+ *
+ *
+ */
+- (NSArray *)__syncPointsInElements:(NSArray *)elements
+{
+	NSMutableArray *points = [NSMutableArray array];
+	
+	for (CZElement *element in elements) {
+		[points addObjectsFromArray:element.points];
+	}
+	
+	/*
+	for (CZElement *element in elements) {
+		NSUInteger elementId = element.databaseId;
+		NSArray *tmpPoints = nil;
+		
+		if (elementId != 0) {
+			for (CZSyncPoint *point in [mPointsById allValues]) {
+				if (point.elementId == elementId)
+					[points addObject:point];
+				else if (point.elementId == 0 && point.element == element)
+					[points addObject:point];
+			}
+		}
+		
+		@synchronized (mTmpPoints) {
+			tmpPoints = [mTmpPoints allValues];
+		}
+		
+		for (CZSyncPoint *point in tmpPoints) {
+			if (point.elementId == 0 && point.element == element)
+				[points addObject:point];
+		}
+	}
+	*/
+	
+	return points;
+}
+
+/**
+ *
+ *
+ */
+- (NSArray *)__syncPointsInScript:(CZScript *)script
+{
+	NSMutableArray *points = [NSMutableArray array];
+	NSArray *tmpPoints = nil;
+	
+	for (CZSyncPoint *point in [mPointsById allValues]) {
+		if (point.script == script)
+			[points addObject:point];
+	}
+	
+	@synchronized (mTmpPoints) {
+		tmpPoints = [mTmpPoints allValues];
+	}
+	
+	for (CZSyncPoint *point in tmpPoints) {
+		if (point.script == script)
+			[points addObject:point];
+	}
+	
+	return points;
+}
+
+/**
+ *
+ *
+ */
+- (NSArray *)__syncPointsInTake:(CZTake *)take
+{
+	NSUInteger takeId = take.databaseId;
+	NSMutableArray *points = [NSMutableArray array];
+	NSArray *tmpPoints = nil;
+	
+	if (takeId != 0) {
+		for (CZSyncPoint *point in [mPointsById allValues]) {
+			if (point.takeId == take.databaseId)
+				[points addObject:point];
+			else if (point.takeId == 0 && point.take == take)
+				[points addObject:point];
+		}
+	}
+	
+	@synchronized (mTmpPoints) {
+		tmpPoints = [mTmpPoints allValues];
+	}
+	
+	for (CZSyncPoint *point in tmpPoints) {
+		if (point.take == take)
+			[points addObject:point];
+	}
+	
+	return [points sortedArrayUsingSelector:@selector(compare:)];
+}
+
+/**
+ *
+ *
+ */
+- (NSArray *)__syncPointsInTakes:(NSArray *)takes
+{
+	NSMutableDictionary *points = [NSMutableDictionary dictionary];
+	NSMutableArray *points2 = [NSMutableArray array];
+	NSArray *tmpPoints = nil;
+	
+	@synchronized (mTmpPoints) {
+		tmpPoints = [mTmpPoints allValues];
+	}
+	
+	for (CZTake *take in takes) {
+		NSUInteger takeId = take.databaseId;
+		
+		if (takeId != 0) {
+			for (CZSyncPoint *point in [mPointsById allValues]) {
+				if (point.takeId == takeId)
+					[points setObject:point forKey:point];
+				else if (point.takeId == 0 && point.take == take)
+					[points2 addObject:point];
+			}
+		}
+		
+		for (CZSyncPoint *point in tmpPoints) {
+			if (point.take == take)
+				[points2 addObject:point];
+		}
+	}
+	
+	[points2 addObjectsFromArray:[points allValues]];
+	
+	return points2;
+}
+
+/**
+ *
+ *
+ */
+- (void)__addCachedSyncPoint:(CZSyncPoint *)point
+{
+	if (point.databaseId == 0)
+		@throw [NSException exceptionWithName:@"CZExceptionNoDatabaseId" reason:@"Database id is zero" userInfo:nil];
+	
+	[mPointCache setObject:point forKey:point];
+}
+
+/**
+ *
+ *
+ */
+- (void)__removeCachedSyncPoint:(CZSyncPoint *)point
+{
+	if (point.databaseId == 0)
+		@throw [NSException exceptionWithName:@"CZExceptionNoDatabaseId" reason:@"Database id is zero" userInfo:nil];
+	
+	[mPointCache removeObjectForKey:point];
+}
+
+/**
+ *
+ *
+ */
+- (CZSyncPoint *)__getCachedSyncPointForSyncPoint:(CZSyncPoint *)point
+{
+	if (point.databaseId == 0)
+		@throw [NSException exceptionWithName:@"CZExceptionNoDatabaseId" reason:@"Database id is zero" userInfo:nil];
+	
+	return [mPointCache objectForKey:point];
+}
+
+
+
+
+
+#pragma mark -
+#pragma mark Slates
+
+/**
+ * Loads all of the slates found in this document's database.
+ *
+ */
+- (void)loadSlates
+{
+	[CZSlate dbobjectSelectAllForDocument:self];
+	NSLog(@"%s.. loaded %u slate(s)", __PRETTY_FUNCTION__, [mSlatesById count]);
+}
+
+/**
+ *
+ *
+ */
+- (void)__addSlate:(CZSlate *)slate
+{
+	if (slate.document != self)
+		@throw [NSException exceptionWithName:@"CZExceptionInvalidDocument" reason:@"Null or invalid document for object." userInfo:nil];
+	
+	if (slate.databaseId != 0)
+		[mSlatesById setObject:slate forKey:slate];
+	else
+		[mTmpSlates setObject:slate forKey:slate];
+}
+
+/**
+ *
+ *
+ */
+- (void)__removeSlate:(CZSlate *)slate
+{
+	if (slate.document != self)
+		@throw [NSException exceptionWithName:@"CZExceptionInvalidDocument" reason:@"Null or invalid document for object." userInfo:nil];
+	
+	if (slate.databaseId != 0) {
+		if (slate.deleted == 0)
+			slate.deleted = 1;
+		else
+			[mSlatesById removeObjectForKey:slate];
+	}
+	else
+		[mTmpSlates removeObjectForKey:slate];
+}
+
+/**
+ * Returns all of the slates for the given script by looking through the mTmpSlates and mSlatesById
+ * structures.
+ *
+ */
+- (NSArray *)__slatesInScript:(CZScript *)script
+{
+	NSUInteger scriptId;
+	NSMutableArray *slates = [NSMutableArray array];
+	
+	if (0 != (scriptId = script.databaseId)) {
+		for (CZSlate *slate in [mSlatesById allValues]) {
+			if (!slate.deleted && scriptId == slate.databaseId)
+				[slates addObject:slate];
+		}
+		
+		for (CZSlate *slate in [mTmpSlates allValues]) {
+			if (scriptId == slate.databaseId)
+				[slates addObject:slate];
+			else if (script == slate.script)
+				[slates addObject:slate];
+		}
+	}
+	else {
+		for (CZSlate *slate in [mTmpSlates allValues]) {
+			if (script == slate.script)
+				[slates addObject:slate];
+		}
+	}
+	
+	return slates;
+}
+
+/**
+ *
+ *
+ */
+- (void)__addCachedSlate:(CZSlate *)slate
+{
+	if (slate.databaseId == 0)
+		@throw [NSException exceptionWithName:@"CZExceptionNoDatabaseId" reason:@"Database id is zero" userInfo:nil];
+	
+	[mSlateCache setObject:slate forKey:slate];
+}
+
+/**
+ *
+ *
+ */
+- (void)__removeCachedSlate:(CZSlate *)slate
+{
+	if (slate.databaseId == 0)
+		@throw [NSException exceptionWithName:@"CZExceptionNoDatabaseId" reason:@"Database id is zero" userInfo:nil];
+	
+	[mSlateCache removeObjectForKey:slate];
+}
+
+/**
+ *
+ *
+ */
+- (CZSlate *)__getCachedSlateForSlate:(CZSlate *)slate
+{
+	if (slate.databaseId == 0)
+		@throw [NSException exceptionWithName:@"CZExceptionNoDatabaseId" reason:@"Database id is zero" userInfo:nil];
+	
+	return [mSlateCache objectForKey:slate];
+}
+
+/**
+ *
+ *
+ */
+- (CZSlate *)slateWithId:(NSUInteger)slateId
+{
+	return [mSlatesById objectForKey:[CZObject objectWithDatabaseId:slateId]];
+}
+
+
+
+
+
+#pragma mark -
+#pragma mark Takes
+
+/**
+ * Loads all of the takes found in this document's database.
+ *
+ */
+- (void)loadTakes
+{
+	[CZTake dbobjectSelectAllForDocument:self];
+	NSLog(@"%s.. loaded %u take(s)", __PRETTY_FUNCTION__, [mTakesById count]);
+}
+
+/**
+ *
+ *
+ */
+- (CZTake *)takeWithId:(NSUInteger)takeId
+{
+	return [mTakesById objectForKey:[CZObject objectWithDatabaseId:takeId]];
+}
+
+/**
+ *
+ *
+ */
+- (void)__addTake:(CZTake *)take
+{
+	if (take.document != self)
+		@throw [NSException exceptionWithName:@"CZExceptionInvalidDocument" reason:@"Null or invalid document for object." userInfo:nil];
+	
+	if (take.databaseId != 0)
+		[mTakesById setObject:take forKey:take];
+	else
+		[mTmpTakes setObject:take forKey:take];
+}
+
+/**
+ *
+ *
+ */
+- (void)__removeTake:(CZTake *)take
+{
+	if (take.document != self)
+		@throw [NSException exceptionWithName:@"CZExceptionInvalidDocument" reason:@"Null or invalid document for object." userInfo:nil];
+	
+	if (take.databaseId != 0) {
+		if (take.deleted == 0)
+			take.deleted = 1;
+		else
+			[mTakesById removeObjectForKey:take];
+	}
+	else
+		[mTmpTakes removeObjectForKey:take];
+}
+
+/**
+ *
+ *
+ */
+- (NSArray *)__takesInSlate:(CZSlate *)slate
+{
+	NSUInteger slateId;
+	NSMutableArray *takes = [NSMutableArray array];
+	
+	slateId = slate.databaseId;
+	
+	if (slateId != 0) {
+		for (CZTake *take in [mTakesById allValues]) {
+			if (take.slateId == slateId)
+				[takes addObject:take];
+			else if (take.slateId == 0 && take.slate == slate)
+				[takes addObject:take];
+		}
+	}
+	
+	for (CZTake *take in [mTmpTakes allValues]) {
+		if (take.slate == slate)
+			[takes addObject:take];
+	}
+	
+	// Order the takes by their position:
+	[takes sortUsingSelector:@selector(compareForDisplay:)];
+	
+	return takes;
+}
+
+/**
+ *
+ *
+ */
+- (NSArray *)__takesInScript:(CZScript *)script
+{
+	NSMutableArray *takes = [NSMutableArray array];
+	
+	for (CZSlate *slate in script.slates) {
+		[takes addObjectsFromArray:slate.takes];
+	}
+	
+	return takes;
+}
+
+/**
+ *
+ *
+ */
+- (void)__addCachedTake:(CZTake *)take
+{
+	if (take.databaseId == 0)
+		@throw [NSException exceptionWithName:@"CZExceptionNoDatabaseId" reason:@"Database id is zero" userInfo:nil];
+	
+	[mTakeCache setObject:take forKey:take];
+}
+
+/**
+ *
+ *
+ */
+- (void)__removeCachedTake:(CZTake *)take
+{
+	if (take.databaseId == 0)
+		@throw [NSException exceptionWithName:@"CZExceptionNoDatabaseId" reason:@"Database id is zero" userInfo:nil];
+	
+	[mTakeCache removeObjectForKey:take];
+}
+
+/**
+ *
+ *
+ */
+- (CZTake *)__getCachedTakeForTake:(CZTake *)take
+{
+	if (take.databaseId == 0)
+		@throw [NSException exceptionWithName:@"CZExceptionNoDatabaseId" reason:@"Database id is zero" userInfo:nil];
+	
+	return [mTakeCache objectForKey:take];
+}
+
+
+
+
+
+#pragma mark -
+#pragma mark Media
+
+/**
+ * Loads all of the medii found in this document's database.
+ *
+ */
+- (void)loadMedia
+{
+	[CZMedia dbobjectSelectAllForDocument:self];
+	NSLog(@"%s.. loaded %u media(s)", __PRETTY_FUNCTION__, [mMediaById count]);
+}
+
+/**
+ *
+ *
+ */
+- (void)__addMedia:(CZMedia *)media
+{
+	if (media.document != self)
+		@throw [NSException exceptionWithName:@"CZExceptionInvalidDocument" reason:@"Null or invalid document for object." userInfo:nil];
+	
+	if (media.databaseId != 0)
+		[mMediaById setObject:media forKey:media];
+	else
+		[mTmpMedia setObject:media forKey:media];
+	
+	[Easy postNotification:CZNotificationMediaInserted object:self userInfo:[NSDictionary dictionaryWithObjectsAndKeys:media, CZKeyMedia, nil]];
+}
+
+/**
+ *
+ *
+ */
+- (void)__removeMedia:(CZMedia *)media
+{
+	if (media.document != self)
+		@throw [NSException exceptionWithName:@"CZExceptionInvalidDocument" reason:@"Null or invalid document for object." userInfo:nil];
+	
+	if (media.databaseId != 0) {
+		if (media.deleted == 0)
+			media.deleted = 1;
+		else
+			[mMediaById removeObjectForKey:media];
+	}
+	else
+		[mTmpMedia removeObjectForKey:media];
+	
+	[Easy postNotification:CZNotificationMediaDeleted object:self userInfo:[NSDictionary dictionaryWithObjectsAndKeys:media, CZKeyMedia, nil]];
+}
+
+/**
+ *
+ *
+ */
+- (void)__addCachedMedia:(CZMedia *)media
+{
+	if (media.databaseId == 0)
+		@throw [NSException exceptionWithName:@"CZExceptionNoDatabaseId" reason:@"Database id is zero" userInfo:nil];
+	
+	[mMediaCache setObject:media forKey:media];
+}
+
+/**
+ *
+ *
+ */
+- (void)__removeCachedMedia:(CZMedia *)media
+{
+	if (media.databaseId == 0)
+		@throw [NSException exceptionWithName:@"CZExceptionNoDatabaseId" reason:@"Database id is zero" userInfo:nil];
+	
+	[mMediaCache removeObjectForKey:media];
+}
+
+/**
+ *
+ *
+ */
+- (CZMedia *)__getCachedMediaForMedia:(CZMedia *)media
+{
+	if (media.databaseId == 0)
+		@throw [NSException exceptionWithName:@"CZExceptionNoDatabaseId" reason:@"Database id is zero" userInfo:nil];
+	
+	return [mMediaCache objectForKey:media];
+}
+
+/**
+ *
+ *
+ */
+- (CZMedia *)mediaWithId:(NSUInteger)mediaId
+{
+	return [mMediaById objectForKey:[CZObject objectWithDatabaseId:mediaId]];
+}
+
+/**
+ *
+ *
+ */
+- (NSArray *)mediaWithPath:(NSString *)path
+{
+	NSMutableArray *medii = [NSMutableArray array];
+	
+	for (CZMedia *media in [mTmpMedia allValues]) {
+		if ([media.path isEqual:path])
+			[medii addObject:media];
+	}
+	
+	for (CZMedia *media in [mMediaById allValues]) {
+		if ([media.path isEqual:path])
+			[medii addObject:media];
+	}
+	
+	return medii;
+}
+
+/**
+ *
+ *
+ */
+- (CZMedia *)mediaWithMedia:(CZMedia *)media
+{
+	for (CZMedia *media2 in [mTmpMedia allValues]) {
+		if ([media2 isEqual:media])
+			return media2;
+	}
+	
+	for (CZMedia *media2 in [mMediaById allValues]) {
+		if ([media2 isEqual:media])
+			return media2;
+	}
+	
+	return nil;
+}
+
+/**
+ *
+ *
+ */
+- (NSArray *)media
+{
+	NSMutableArray *medii = [NSMutableArray array];
+	
+	for (CZMedia *media in [mMediaById allValues]) {
+		if (media.deleted == 0)
+			[medii addObject:media];
+	}
+	
+	for (CZMedia *media in [mTmpMedia allValues]) {
+		if (media.deleted == 0)
+			[medii addObject:media];
+	}
+	
+	return medii;
+}
+
+
+
+
+
+#pragma mark -
+#pragma mark Rough Cuts
+
+/**
+ * Loads all of the scripts found in this document's database into the scripts array of the document.
+ *
+ */
+- (void)loadRoughCuts
+{
+	[CZRoughCut dbobjectSelectAllForDocument:self];
+	NSLog(@"%s.. loaded %u roughcuts(s)", __PRETTY_FUNCTION__, [mRoughCutsById count]);
+}
+
+/**
+ *
+ *
+ */
+- (NSArray *)roughCuts
+{
+	NSMutableArray *roughcuts = [NSMutableArray array];
+	
+	[roughcuts addObjectsFromArray:[mRoughCutsById allValues]];
+	[roughcuts addObjectsFromArray:[mTmpRoughCuts allValues]];
+	
+	return roughcuts;
+}
+
+/**
+ *
+ *
+ */
+- (CZRoughCut *)roughCutWithId:(NSUInteger)roughCutId
+{
+	return [mRoughCutsById objectForKey:[CZObject objectWithDatabaseId:roughCutId]];
+}
+
+/**
+ *
+ *
+ */
+- (void)__addRoughCut:(CZRoughCut *)roughCut
+{
+	if (roughCut.document != self)
+		@throw [NSException exceptionWithName:@"CZExceptionInvalidDocument" reason:@"Null or invalid document for object." userInfo:nil];
+	
+	if (roughCut.databaseId != 0)
+		[mRoughCutsById setObject:roughCut forKey:roughCut];
+	else
+		[mTmpRoughCuts setObject:roughCut forKey:roughCut];
+	
+	[Easy postNotification:CZNotificationRoughCutInserted object:self userInfo:[NSDictionary dictionaryWithObjectsAndKeys:roughCut, CZKeyRoughCut, nil]];
+}
+
+/**
+ *
+ *
+ */
+- (void)__removeRoughCut:(CZRoughCut *)roughCut
+{
+	if (roughCut.document != self)
+		@throw [NSException exceptionWithName:@"CZExceptionInvalidDocument" reason:@"Null or invalid document for object." userInfo:nil];
+	
+	if (roughCut.databaseId != 0) {
+		if (roughCut.deleted == 0)
+			roughCut.deleted = 1;
+		else
+			[mRoughCutsById removeObjectForKey:roughCut];
+	}
+	else
+		[mTmpRoughCuts removeObjectForKey:roughCut];
+	
+	[Easy postNotification:CZNotificationRoughCutDeleted object:self userInfo:[NSDictionary dictionaryWithObjectsAndKeys:roughCut, CZKeyRoughCut, nil]];
+}
+
+/**
+ *
+ *
+ */
+- (void)__addCachedRoughCut:(CZRoughCut *)roughCut
+{
+	if (roughCut.databaseId == 0)
+		@throw [NSException exceptionWithName:@"CZExceptionNoDatabaseId" reason:@"Database id is zero" userInfo:nil];
+	
+	[mRoughCutCache setObject:roughCut forKey:roughCut];
+}
+
+/**
+ *
+ *
+ */
+- (void)__removeCachedRoughCut:(CZRoughCut *)roughCut
+{
+	if (roughCut.databaseId == 0)
+		@throw [NSException exceptionWithName:@"CZExceptionNoDatabaseId" reason:@"Database id is zero" userInfo:nil];
+	
+	[mRoughCutCache removeObjectForKey:roughCut];
+}
+
+/**
+ *
+ *
+ */
+- (CZRoughCut *)__getCachedRoughCutForRoughCut:(CZRoughCut *)roughCut
+{
+	if (roughCut.databaseId == 0)
+		@throw [NSException exceptionWithName:@"CZExceptionNoDatabaseId" reason:@"Database id is zero" userInfo:nil];
+	
+	return [mRoughCutCache objectForKey:roughCut];
+}
+
+
+
+
+
+#pragma mark -
+#pragma mark Rough Cut Segments
+
+/**
+ * Loads all of the roughcut segments found in this document's database.
+ *
+ */
+- (void)loadRoughCutSegments
+{
+	[CZRoughCutSegment dbobjectSelectAllForDocument:self];
+	NSLog(@"%s.. loaded %u roughcut segment(s)", __PRETTY_FUNCTION__, [mSegmentsById count]);
+}
+
+/**
+ *
+ *
+ */
+- (void)__addRoughCutSegment:(CZRoughCutSegment *)segment
+{
+	if (segment.document != self)
+		@throw [NSException exceptionWithName:@"CZExceptionInvalidDocument" reason:@"Null or invalid document for object." userInfo:nil];
+	
+	if (segment.databaseId != 0)
+		[mSegmentsById setObject:segment forKey:segment];
+	else
+		[mTmpSegments setObject:segment forKey:segment];
+	
+	[Easy postNotification:CZNotificationRoughCutChanged object:self userInfo:[NSDictionary dictionaryWithObjectsAndKeys:segment.roughCut, CZKeyRoughCut, nil]];
+}
+
+/**
+ *
+ *
+ */
+- (void)__removeRoughCutSegment:(CZRoughCutSegment *)segment
+{
+	if (segment.document != self)
+		@throw [NSException exceptionWithName:@"CZExceptionInvalidDocument" reason:@"Null or invalid document for object." userInfo:nil];
+	
+	if (segment.databaseId != 0) {
+		if (segment.deleted == 0)
+			segment.deleted = 1;
+		else
+			[mSegmentsById removeObjectForKey:segment];
+	}
+	else
+		[mTmpSegments removeObjectForKey:segment];
+	
+	[Easy postNotification:CZNotificationRoughCutChanged object:self userInfo:[NSDictionary dictionaryWithObjectsAndKeys:segment.roughCut, CZKeyRoughCut, nil]];
+}
+
+/**
+ *
+ *
+ */
+- (NSArray *)__roughCutSegmentsInRoughCut:(CZRoughCut *)roughcut
+{
+	NSUInteger roughcutId = roughcut.databaseId;
+	NSMutableArray *segments = [NSMutableArray array];
+	
+	if (roughcutId != 0) {
+		for (CZRoughCutSegment *segment in [mSegmentsById allValues]) {
+			if (segment.roughCutId == roughcutId)
+				[segments addObject:segment];
+			else if (segment.roughCutId == 0 && segment.roughCut == roughcut)
+				[segments addObject:segment];
+		}
+	}
+	
+	for (CZRoughCutSegment *segment in [mTmpSegments allValues]) {
+		if (segment.roughCut == roughcut)
+			[segments addObject:segment];
+	}
+	
+	return segments;
+}
+
+/**
+ *
+ *
+ */
+- (void)__addCachedRoughCutSegment:(CZRoughCutSegment *)segment
+{
+	if (segment.databaseId == 0)
+		@throw [NSException exceptionWithName:@"CZExceptionNoDatabaseId" reason:@"Database id is zero" userInfo:nil];
+	
+	[mSegmentCache setObject:segment forKey:segment];
+}
+
+/**
+ *
+ *
+ */
+- (void)__removeCachedRoughCutSegment:(CZRoughCutSegment *)segment
+{
+	if (segment.databaseId == 0)
+		@throw [NSException exceptionWithName:@"CZExceptionNoDatabaseId" reason:@"Database id is zero" userInfo:nil];
+	
+	[mSegmentCache removeObjectForKey:segment];
+}
+
+/**
+ *
+ *
+ */
+- (CZRoughCutSegment *)__getCachedRoughCutSegmentForRoughCutSegment:(CZRoughCutSegment *)segment
+{
+	if (segment.databaseId == 0)
+		@throw [NSException exceptionWithName:@"CZExceptionNoDatabaseId" reason:@"Database id is zero" userInfo:nil];
+	
+	return [mSegmentCache objectForKey:segment];
+}
+
+
+
+
+
+#pragma mark -
+#pragma mark Styles
+
+/**
+ *
+ *
+ */
+- (void)loadScriptStyles
+{
+	[CZScriptStyle dbobjectSelectAllForDocument:self];
+	NSLog(@"%s.. loaded %u script style(s)", __PRETTY_FUNCTION__, [mScriptStylesById count]);
+}
+
+/**
+ *
+ *
+ */
+- (void)__addScriptStyle:(CZScriptStyle *)scriptStyle
+{
+	if (scriptStyle.document != self)
+		@throw [NSException exceptionWithName:@"CZExceptionInvalidDocument" reason:@"Null or invalid document for object." userInfo:nil];
+	
+	if (scriptStyle.databaseId != 0)
+		[mScriptStylesById setObject:scriptStyle forKey:scriptStyle];
+	else
+		[mTmpScriptStyles setObject:scriptStyle forKey:scriptStyle];
+}
+
+/**
+ *
+ *
+ */
+- (void)__removeScriptStyle:(CZScriptStyle *)scriptStyle
+{
+	if (scriptStyle.document != self)
+		@throw [NSException exceptionWithName:@"CZExceptionInvalidDocument" reason:@"Null or invalid document for object." userInfo:nil];
+	
+	if (scriptStyle.databaseId != 0) {
+		if (scriptStyle.deleted == 0)
+			scriptStyle.deleted = 1;
+		else
+			[mScriptStylesById removeObjectForKey:scriptStyle];
+	}
+	else
+		[mTmpScriptStyles removeObjectForKey:scriptStyle];
+}
+
+/**
+ *
+ *
+ */
+- (void)__addCachedScriptStyle:(CZScriptStyle *)scriptStyle
+{
+	if (scriptStyle.databaseId == 0)
+		@throw [NSException exceptionWithName:@"CZExceptionNoDatabaseId" reason:@"Database id is zero" userInfo:nil];
+	
+	[mScriptStyleCache setObject:scriptStyle forKey:scriptStyle];
+}
+
+/**
+ *
+ *
+ */
+- (void)__removeCachedScriptStyle:(CZScriptStyle *)scriptStyle
+{
+	if (scriptStyle.databaseId == 0)
+		@throw [NSException exceptionWithName:@"CZExceptionNoDatabaseId" reason:@"Database id is zero" userInfo:nil];
+	
+	[mScriptStyleCache removeObjectForKey:scriptStyle];
+}
+
+/**
+ *
+ *
+ */
+- (CZScriptStyle *)__getCachedScriptStyleForScriptStyle:(CZScriptStyle *)scriptStyle
+{
+	if (scriptStyle.databaseId == 0)
+		@throw [NSException exceptionWithName:@"CZExceptionNoDatabaseId" reason:@"Database id is zero" userInfo:nil];
+	
+	return [mScriptStyleCache objectForKey:scriptStyle];
+}
+
+/**
+ *
+ *
+ */
+- (void)loadParagraphStyles
+{
+	[CZParagraphStyle dbobjectSelectAllForDocument:self];
+	NSLog(@"%s.. loaded %u paragraph style(s)", __PRETTY_FUNCTION__, [mParagraphStylesById count]);
+}
+
+/**
+ *
+ *
+ */
+- (void)__addParagraphStyle:(CZParagraphStyle *)paragraphStyle
+{
+	if (paragraphStyle.document != self)
+		@throw [NSException exceptionWithName:@"CZExceptionInvalidDocument" reason:@"Null or invalid document for object." userInfo:nil];
+	
+	if (paragraphStyle.databaseId != 0)
+		[mParagraphStylesById setObject:paragraphStyle forKey:paragraphStyle];
+	else
+		[mTmpParagraphStyles setObject:paragraphStyle forKey:paragraphStyle];
+}
+
+/**
+ *
+ *
+ */
+- (void)__removeParagraphStyle:(CZParagraphStyle *)paragraphStyle
+{
+	if (paragraphStyle.document != self)
+		@throw [NSException exceptionWithName:@"CZExceptionInvalidDocument" reason:@"Null or invalid document for object." userInfo:nil];
+	
+	if (paragraphStyle.databaseId != 0) {
+		if (paragraphStyle.deleted == 0)
+			paragraphStyle.deleted = 1;
+		else
+			[mParagraphStylesById removeObjectForKey:paragraphStyle];
+	}
+	else
+		[mTmpParagraphStyles removeObjectForKey:paragraphStyle];
+}
+
+/**
+ *
+ *
+ */
+- (void)__addCachedParagraphStyle:(CZParagraphStyle *)paragraphStyle
+{
+	if (paragraphStyle.databaseId == 0)
+		@throw [NSException exceptionWithName:@"CZExceptionNoDatabaseId" reason:@"Database id is zero" userInfo:nil];
+	
+	[mParagraphStyleCache setObject:paragraphStyle forKey:paragraphStyle];
+}
+
+/**
+ *
+ *
+ */
+- (void)__removeCachedParagraphStyle:(CZParagraphStyle *)paragraphStyle
+{
+	if (paragraphStyle.databaseId == 0)
+		@throw [NSException exceptionWithName:@"CZExceptionNoDatabaseId" reason:@"Database id is zero" userInfo:nil];
+	
+	[mParagraphStyleCache removeObjectForKey:paragraphStyle];
+}
+
+/**
+ *
+ *
+ */
+- (CZParagraphStyle *)__getCachedParagraphStyleForParagraphStyle:(CZParagraphStyle *)paragraphStyle
+{
+	if (paragraphStyle.databaseId == 0)
+		@throw [NSException exceptionWithName:@"CZExceptionNoDatabaseId" reason:@"Database id is zero" userInfo:nil];
+	
+	return [mParagraphStyleCache objectForKey:paragraphStyle];
+}
+
+
+
+
+
+#pragma mark -
+#pragma mark Spans
+
+/**
+ * Loads all of the spans found in this document's database.
+ *
+ */
+- (void)loadSpans
+{
+	[CZSpan dbobjectSelectAllForDocument:self];
+	NSLog(@"%s.. loaded %u spans(s)", __PRETTY_FUNCTION__, [mSpansById count]);
+}
+
+/**
+ *
+ *
+ */
+- (void)__addSpan:(CZSpan *)span
+{
+	if (span.document != self)
+		@throw [NSException exceptionWithName:@"CZExceptionInvalidDocument" reason:@"Null or invalid document for object." userInfo:nil];
+	
+	if (span.databaseId != 0)
+		[mSpansById setObject:span forKey:span];
+	else
+		[mTmpSpans setObject:span forKey:span];
+}
+
+/**
+ *
+ *
+ */
+- (void)__removeSpan:(CZSpan *)span
+{
+	if (span.document != self)
+		@throw [NSException exceptionWithName:@"CZExceptionInvalidDocument" reason:@"Null or invalid document for object." userInfo:nil];
+	
+	if (span.databaseId != 0) {
+		if (span.deleted == 0)
+			span.deleted = 1;
+		else
+			[mSpansById removeObjectForKey:span];
+	}
+	else
+		[mTmpSpans removeObjectForKey:span];
+}
+
+/**
+ *
+ *
+ */
+- (CZSpan *)spanWithId:(NSUInteger)spanId
+{
+	return [mSpansById objectForKey:[CZObject objectWithDatabaseId:spanId]];
+}
+
+/**
+ *
+ *
+ */
+- (NSArray *)__spansForTake:(CZTake *)take
+{
+	NSUInteger takeId;
+	NSMutableArray *spans = [NSMutableArray array];
+	
+	takeId = take.databaseId;
+	
+	if (takeId != 0) {
+		for (CZSpan *span in [mSpansById allValues]) {
+			if (span.takeId == takeId)
+				[spans addObject:span];
+		}
+	}
+	
+	for (CZSpan *span in [mTmpSpans allValues]) {
+		if (span.take == take)
+			[spans addObject:span];
+	}
+	
+	return spans;
+}
+
+/**
+ *
+ *
+ */
+- (void)__addCachedSpan:(CZSpan *)span
+{
+	if (span.databaseId == 0)
+		@throw [NSException exceptionWithName:@"CZExceptionNoDatabaseId" reason:@"Database id is zero" userInfo:nil];
+	
+	[mSpanCache setObject:span forKey:span];
+}
+
+/**
+ *
+ *
+ */
+- (void)__removeCachedSpan:(CZSpan *)span
+{
+	if (span.databaseId == 0)
+		@throw [NSException exceptionWithName:@"CZExceptionNoDatabaseId" reason:@"Database id is zero" userInfo:nil];
+	
+	[mSpanCache removeObjectForKey:span];
+}
+
+/**
+ *
+ *
+ */
+- (CZSpan *)__getCachedSpanForSpan:(CZSpan *)span
+{
+	if (span.databaseId == 0)
+		@throw [NSException exceptionWithName:@"CZExceptionNoDatabaseId" reason:@"Database id is zero" userInfo:nil];
+	
+	return [mSpanCache objectForKey:span];
+}
+
+
+
+
+
+#pragma mark -
+#pragma mark Span Labels
+
+/**
+ *
+ *
+ */
+- (void)loadSpanLabels
+{
+	[CZSpanLabel dbobjectSelectAllForDocument:self];
+	NSLog(@"%s.. loaded %u color label(s)", __PRETTY_FUNCTION__, [mSpanLabelsById count]);
+}
+
+/**
+ *
+ *
+ */
+- (NSArray *)spanLabelsWithColors
+{
+	NSMutableArray *array = [NSMutableArray array];
+	
+	for (CZSpanLabel *label in [mTmpSpanLabels allValues]) {
+		if (label.deleted == 0 && label.color != 0)
+			[array addObject:label];
+	}
+	
+	for (CZSpanLabel *label in [mSpanLabelsById allValues]) {
+		if (label.deleted == 0 && label.color != 0)
+			[array addObject:label];
+	}
+	
+	return array;
+}
+
+/**
+ *
+ *
+ */
+- (NSArray *)spanLabelsWithStyles
+{
+	NSMutableArray *array = [NSMutableArray array];
+	
+	for (CZSpanLabel *label in [mTmpSpanLabels allValues]) {
+		if (label.deleted == 0 && label.style != 0)
+			[array addObject:label];
+	}
+	
+	for (CZSpanLabel *label in [mSpanLabelsById allValues]) {
+		if (label.deleted == 0 && label.style != 0)
+			[array addObject:label];
+	}
+	
+	return array;
+}
+
+/**
+ *
+ *
+ */
+- (CZSpanLabel *)spanLabelWithId:(NSUInteger)spanLabelId
+{
+	return [mSpanLabelsById objectForKey:[CZObject objectWithDatabaseId:spanLabelId]];
+}
+
+/**
+ *
+ *
+ */
+- (void)__addSpanLabel:(CZSpanLabel *)spanLabel
+{
+	if (spanLabel.document != self)
+		@throw [NSException exceptionWithName:@"CZExceptionInvalidDocument" reason:@"Null or invalid document for object." userInfo:nil];
+	
+	if (spanLabel.databaseId != 0)
+		[mSpanLabelsById setObject:spanLabel forKey:spanLabel];
+	else
+		[mTmpSpanLabels setObject:spanLabel forKey:spanLabel];
+}
+
+/**
+ *
+ *
+ */
+- (void)__removeSpanLabel:(CZSpanLabel *)spanLabel
+{
+	if (spanLabel.document != self)
+		@throw [NSException exceptionWithName:@"CZExceptionInvalidDocument" reason:@"Null or invalid document for object." userInfo:nil];
+	
+	if (spanLabel.databaseId != 0) {
+		if (spanLabel.deleted == 0)
+			spanLabel.deleted = 1;
+		else
+			[mSpanLabelsById removeObjectForKey:spanLabel];
+	}
+	else
+		[mTmpSpanLabels removeObjectForKey:spanLabel];
+}
+
+/**
+ *
+ *
+ */
+- (CZSpanLabel *)spanLabelWithColor:(NSUInteger)color
+{
+	for (CZSpanLabel *label in [mSpanLabelsById allValues]) {
+		if (label.style == 0 && label.color == color)
+			return label;
+	}
+	
+	for (CZSpanLabel *label in [mTmpSpanLabels allValues]) {
+		if (label.style == 0 && label.color == color)
+			return label;
+	}
+	
+	return nil;
+}
+
+/**
+ *
+ *
+ */
+- (CZSpanLabel *)spanLabelWithStyle:(NSUInteger)style
+{
+	for (CZSpanLabel *label in [mSpanLabelsById allValues]) {
+		if (label.color == 0 && label.style == style)
+			return label;
+	}
+	
+	for (CZSpanLabel *label in [mTmpSpanLabels allValues]) {
+		if (label.color == 0 && label.style == style)
+			return label;
+	}
+	
+	return nil;
+}
+
+/**
+ *
+ *
+ */
+- (void)__addCachedSpanLabel:(CZSpanLabel *)spanLabel
+{
+	if (spanLabel.databaseId == 0)
+		@throw [NSException exceptionWithName:@"CZExceptionNoDatabaseId" reason:@"Database id is zero" userInfo:nil];
+	
+	[mSpanLabelCache setObject:spanLabel forKey:spanLabel];
+}
+
+/**
+ *
+ *
+ */
+- (void)__removeCachedSpanLabel:(CZSpanLabel *)spanLabel
+{
+	if (spanLabel.databaseId == 0)
+		@throw [NSException exceptionWithName:@"CZExceptionNoDatabaseId" reason:@"Database id is zero" userInfo:nil];
+	
+	[mSpanLabelCache removeObjectForKey:spanLabel];
+}
+
+/**
+ *
+ *
+ */
+- (CZSpanLabel *)__getCachedSpanLabelForSpanLabel:(CZSpanLabel *)spanLabel
+{
+	if (spanLabel.databaseId == 0)
+		@throw [NSException exceptionWithName:@"CZExceptionNoDatabaseId" reason:@"Database id is zero" userInfo:nil];
+	
+	return [mSpanLabelCache objectForKey:spanLabel];
+}
+
+@end

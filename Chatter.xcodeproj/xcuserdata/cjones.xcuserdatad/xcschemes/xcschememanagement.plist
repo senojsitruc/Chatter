@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>SchemeUserState</key>
+	<dict>
+		<key>AIM Importer.xcscheme</key>
+		<dict>
+			<key>orderHint</key>
+			<integer>4</integer>
+		</dict>
+		<key>Adium.xcscheme</key>
+		<dict>
+			<key>orderHint</key>
+			<integer>3</integer>
+		</dict>
+		<key>Chatter (Demo).xcscheme</key>
+		<dict>
+			<key>orderHint</key>
+			<integer>1</integer>
+		</dict>
+		<key>Chatter (MAS).xcscheme</key>
+		<dict>
+			<key>orderHint</key>
+			<integer>2</integer>
+		</dict>
+		<key>Chatter.xcscheme</key>
+		<dict>
+			<key>orderHint</key>
+			<integer>0</integer>
+		</dict>
+		<key>Colloquy Importer.xcscheme</key>
+		<dict>
+			<key>orderHint</key>
+			<integer>5</integer>
+		</dict>
+		<key>InstantBird Importer.xcscheme</key>
+		<dict>
+			<key>orderHint</key>
+			<integer>7</integer>
+		</dict>
+		<key>Skype Importer.xcscheme</key>
+		<dict>
+			<key>orderHint</key>
+			<integer>9</integer>
+		</dict>
+		<key>Trillian Importer.xcscheme</key>
+		<dict>
+			<key>orderHint</key>
+			<integer>8</integer>
+		</dict>
+		<key>cexport.xcscheme</key>
+		<dict>
+			<key>orderHint</key>
+			<integer>11</integer>
+		</dict>
+		<key>cimport.xcscheme</key>
+		<dict>
+			<key>orderHint</key>
+			<integer>10</integer>
+		</dict>
+		<key>ctransmute.xcscheme</key>
+		<dict>
+			<key>orderHint</key>
+			<integer>12</integer>
+		</dict>
+		<key>iChat Importer.xcscheme</key>
+		<dict>
+			<key>orderHint</key>
+			<integer>6</integer>
+		</dict>
+	</dict>
+	<key>SuppressBuildableAutocreation</key>
+	<dict>
+		<key>F91EBD4A13C52076001C5EFC</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
+		<key>F91EBDEF13C52082001C5EFC</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
+		<key>F940A46313C8DCFD008F9B47</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
+		<key>F940A48A13C8E5CE008F9B47</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
+		<key>F940A4A813C8EC39008F9B47</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
+		<key>F940A4CE13C8F1CA008F9B47</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
+		<key>F95AE6CB13C8C22400164EAD</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
+		<key>F96FF25A13B0FAE0001C40F6</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
+		<key>F9912DFB13CCF9B5003469A3</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
+		<key>F9912E0B13CCF9C6003469A3</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
+		<key>F9912E1A13CCFCE8003469A3</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
+		<key>F9BA482113C90637004D332C</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
+		<key>F9DAB36E13C90FDF00A893C7</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
+	</dict>
+</dict>
+</plist>

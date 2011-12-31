@@ -1,0 +1,167 @@
+--
+-- setting
+--
+CREATE TABLE setting
+(
+  id INTEGER NOT NULL PRIMARY KEY,
+  name VARCHAR(100) NOT NULL,
+  value VARCHAR(1000)
+);
+CREATE UNIQUE INDEX setting_name_value ON setting(name, value);
+INSERT INTO setting (name, value) VALUES ("Database Version", "5");
+
+
+
+
+
+
+
+
+
+
+--
+-- person
+--
+-- abuid - an address book record identifier (kABUIDProperty) which is of type "kABStringProperty".
+--         this value is only filled in if a correlation has been made between an account and an
+--         address book record; otherwise the user can just provide a free-form first/last name.
+--
+CREATE TABLE person
+(
+  id INTEGER NOT NULL PRIMARY KEY,
+  first_name VARCHAR(100),
+  last_name VARCHAR(100),
+  abuid VARCHAR(100) UNIQUE
+);
+
+--
+-- account
+--
+-- an account record exists for each screenname. an account can optionall be associated with a 
+-- person. a person can be associated with any number of accounts. this association is convenient 
+-- for grouping data by a person's name instead of the often somewhat more terse screenname.
+--
+CREATE TABLE account
+(
+  id INTEGER NOT NULL PRIMARY KEY,
+  person_id INTEGER REFERENCES person(id) ON DELETE CASCADE,
+  screenname VARCHAR(100) NOT NULL UNIQUE
+);
+
+--
+-- source
+--
+-- each chat log file that we import will have a record here, so that we can skip those files in
+-- the future, if they haven't changed.
+--
+-- service - the name of the importer that was used to parse the log file. For instance, "AIM",
+--           "iChat", "Skype", "Adium", etc.
+--
+-- alias - a binary representation of an AliasHandle. with this handle we can find the source file
+--         even if it has been moved or rennamed.
+--
+CREATE TABLE source
+(
+  id INTEGER NOT NULL PRIMARY KEY,
+  service VARCHAR(100) NOT NULL,
+  path VARCHAR(1000) NOT NULL UNIQUE,
+  alias BLOB,
+  timestamp DATETIME NOT NULL
+);
+
+--
+-- session
+--
+-- a session record represents a single conversation.
+--
+-- in most chat clients, there is a one-to-one relationship between conversations and log files.
+-- in icq and skype, a small number of files hold the entirety of the chat history, thus we need to
+-- distinguish between a conversation (ie, a "session") and a source (ie, the log file).
+--
+-- name - in the two aforementioned cases, the session name will be an implementation-specific 
+--        identifier. in the normal case of one-conversation-per-file, the session name will be the 
+--        file path.
+--
+-- timestamp - the time at which the conversation started.
+--
+CREATE TABLE session
+(
+  id INTEGER NOT NULL PRIMARY KEY,
+  source_id INTEGER NOT NULL REFERENCES source(id) ON DELETE CASCADE,
+  name VARCHAR(1000) NOT NULL UNIQUE,
+  timestamp DATETIME NOT NULL
+);
+
+--
+-- sessionaccount
+--
+-- by looking at this table, we can find all of the people who participated in a chat; where
+-- "chat" = "session", and "people" = "account". See?
+--
+CREATE TABLE sessionaccount
+(
+  id INTEGER NOT NULL PRIMARY KEY,
+  session_id INTEGER NOT NULL REFERENCES session(id) ON DELETE CASCADE,
+  account_id INTEGER NOT NULL REFERENCES account(id) ON DELETE CASCADE,
+  CONSTRAINT session_account UNIQUE (session_id, account_id) ON CONFLICT IGNORE
+);
+CREATE INDEX sessionaccount_accountid ON sessionaccount(account_id);
+CREATE INDEX sessionaccount_sessionid ON sessionaccount(session_id);
+
+
+
+
+
+
+
+
+
+
+--
+-- message
+--
+-- account_id - will be null if this message is outgoing; otherwise, it links to the screenname of
+--              the other party; that is, the person to whom you sent the message or the person from
+--              whom you received the message.
+--
+CREATE TABLE message
+(
+  id INTEGER NOT NULL PRIMARY KEY,
+  account_id INTEGER REFERENCES account(id) ON DELETE CASCADE,
+  source_id INTEGER NOT NULL REFERENCES source(id) ON DELETE CASCADE,
+  session_id INTEGER NOT NULL REFERENCES session(id) ON DELETE CASCADE,
+  timestamp DATETIME NOT NULL,
+  render_width INTEGER NOT NULL,
+  render_height INTEGER NOT NULL,
+  message VARCHAR(1000)
+);
+CREATE INDEX message_account ON message(account_id);
+CREATE INDEX message_source ON message(source_id);
+CREATE INDEX message_session ON message(session_id);
+CREATE INDEX message_ts_ses_act_msg ON message(timestamp, session_id, account_id, message);
+
+--
+-- word
+--
+-- one record exists in this table for each distinct word; where a word is roughly any group of
+-- letters bounded by white space or certain punctuation.
+--
+CREATE TABLE word
+(
+  id INTEGER NOT NULL PRIMARY KEY,
+  word VARCHAR(100) NOT NULL UNIQUE ON CONFLICT IGNORE
+);
+
+--
+-- message_word
+--
+-- maps a word and a message together, such that every distinct word that occurs in a message
+-- will have a record here, linking the message to that word.
+--
+CREATE TABLE messageword
+(
+  message_id INTEGER NOT NULL REFERENCES message(id) ON DELETE CASCADE,
+  word_id INTEGER NOT NULL REFERENCES word(id) ON DELETE CASCADE
+);
+CREATE INDEX messageword_wordid ON messageword(word_id);
+CREATE UNIQUE INDEX messageword_index ON messageword(message_id, word_id);
