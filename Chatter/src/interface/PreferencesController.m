@@ -200,7 +200,7 @@
 - (NSToolbarItem*)toolbar:(NSToolbar*)toolbar itemForItemIdentifier:(NSString*)str willBeInsertedIntoToolbar:(BOOL)flag
 {
 	if ([str isEqualToString:@"ChatterPreferenceGeneralItemIdentifier"]) {
-		NSToolbarItem *toolbarItem = [[[NSToolbarItem alloc] initWithItemIdentifier:str] autorelease];
+		NSToolbarItem *toolbarItem = [[NSToolbarItem alloc] initWithItemIdentifier:str];
 		
 		[toolbarItem setLabel:@"General"];
 		[toolbarItem setPaletteLabel:@"General"];
@@ -214,7 +214,7 @@
 		return toolbarItem;
 	}
 	else if ([str isEqualToString:@"ChatterPreferenceAppearanceItemIdentifier"]) {
-		NSToolbarItem *toolbarItem = [[[NSToolbarItem alloc] initWithItemIdentifier:str] autorelease];
+		NSToolbarItem *toolbarItem = [[NSToolbarItem alloc] initWithItemIdentifier:str];
 		
 		[toolbarItem setLabel:@"Appearance"];
 		[toolbarItem setPaletteLabel:@"Appearance"];
@@ -228,7 +228,7 @@
 		return toolbarItem;
 	}
 	else if ([str isEqualToString:@"ChatterPreferenceImportersItemIdentifier"]) {
-		NSToolbarItem *toolbarItem = [[[NSToolbarItem alloc] initWithItemIdentifier:str] autorelease];
+		NSToolbarItem *toolbarItem = [[NSToolbarItem alloc] initWithItemIdentifier:str];
 		
 		[toolbarItem setLabel:@"Importers"];
 		[toolbarItem setPaletteLabel:@"Importers"];
@@ -242,7 +242,7 @@
 		return toolbarItem;
 	}
 	else if ([str isEqualToString:@"ChatterPreferenceExportersItemIdentifier"]) {
-		NSToolbarItem *toolbarItem = [[[NSToolbarItem alloc] initWithItemIdentifier:str] autorelease];
+		NSToolbarItem *toolbarItem = [[NSToolbarItem alloc] initWithItemIdentifier:str];
 		
 		[toolbarItem setLabel:@"Exporters"];
 		[toolbarItem setPaletteLabel:@"Exporters"];
@@ -256,7 +256,7 @@
 		return toolbarItem;
 	}
 	else if ([str isEqualToString:@"ChatterPreferenceFacebookItemIdentifier"]) {
-		NSToolbarItem *toolbarItem = [[[NSToolbarItem alloc] initWithItemIdentifier:str] autorelease];
+		NSToolbarItem *toolbarItem = [[NSToolbarItem alloc] initWithItemIdentifier:str];
 		
 		[toolbarItem setLabel:@"Facebook"];
 		[toolbarItem setPaletteLabel:@"Facebook"];
@@ -270,8 +270,8 @@
 		return toolbarItem;
 	}
 	else if ([str isEqualToString:@"ChatterPreferenceDoneItemIdentifier"]) {
-		NSToolbarItem *toolbarItem = [[[NSToolbarItem alloc] initWithItemIdentifier:str] autorelease];
-		NSButton *doneBtn = [[[NSButton alloc] init] autorelease];
+		NSToolbarItem *toolbarItem = [[NSToolbarItem alloc] initWithItemIdentifier:str];
+		NSButton *doneBtn = [[NSButton alloc] init];
 		
 		[doneBtn setButtonType:NSMomentaryPushInButton];
 		[doneBtn setBezelStyle:NSRoundedBezelStyle];

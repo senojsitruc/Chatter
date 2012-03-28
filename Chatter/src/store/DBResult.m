@@ -28,71 +28,72 @@
  *
  *
  */
-- (BOOL)getString:(NSString **)value atColumn:(NSUInteger)column
+- (NSString *)getStringAtColumn:(NSUInteger)column
 {
-	return FALSE;
+	return nil;
 }
 
 /**
  *
  *
  */
-- (BOOL)getBlob:(NSData **)value atColumn:(NSUInteger)column
+- (NSData *)getBlobAtColumn:(NSUInteger)column
 {
-	return FALSE;
+	return nil;
 }
 
 /**
  *
  *
  */
-- (BOOL)getDate:(NSDate **)value atColumn:(NSUInteger)column
+- (NSDate *)getDateAtColumn:(NSUInteger)column
 {
-	return FALSE;
+	return nil;
 }
 
 /**
  *
  *
  */
-- (BOOL)getInt32:(NSInteger *)value atColumn:(NSUInteger)column
+- (NSInteger)getInt32AtColumn:(NSUInteger)column
 {
-	return FALSE;
+	return 0;
 }
 
 /**
  *
  *
  */
-- (BOOL)getUint32:(NSUInteger *)value atColumn:(NSUInteger)column
+- (NSUInteger)getUint32AtColumn:(NSUInteger)column
 {
-	return FALSE;
+	return 0;
 }
 
 /**
  *
  *
  */
-- (BOOL)getUint64:(uint64_t *)value atColumn:(NSUInteger)column
+- (uint64_t)getUint64AtColumn:(NSUInteger)column
 {
-	return FALSE;
+	return 0;
 }
 
 /**
  *
  *
  */
-- (BOOL)getFloat:(float *)value atColumn:(NSUInteger)column
+- (float)getFloatAtColumn:(NSUInteger)column
 {
-	return FALSE;
+	return 0.;
 }
 
 /**
  *
+ *
  */
-- (BOOL)getDouble:(double *)value atColumn:(NSUInteger)column
+- (double)getDoubleAtColumn:(NSUInteger)column
 {
-	return FALSE;
+	return 0.;
 }
 
 @end

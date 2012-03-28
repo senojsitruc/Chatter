@@ -32,12 +32,10 @@
 
 - (void)main
 {
-	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-	
-	[NSThread __updateCurrentThreadName];
-	
-	[super main];
-	[pool drain];
+	@autoreleasepool {
+		[NSThread __updateCurrentThreadName];
+		[super main];
+	}
 }
 
 @end
@@ -47,11 +45,6 @@
 
 @implementation NGThreadBlock
 
-- (void)dealloc
-{
-	[mBlock release];
-	[super dealloc];
-}
 
 @end
 
@@ -84,10 +77,9 @@
 
 + (void)__runBlock:(void (^)())block
 {
-	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-	block();
-	[block release];
-	[pool release];
+	@autoreleasepool {
+		block();
+	}
 }
 
 + (void)performBlockInBackground:(void (^)())block
@@ -97,14 +89,14 @@
 
 + (NSThread *)detachNewThreadBlock:(void (^)())block
 {
-	NSThread *thread = [[[NSThread alloc] initWithBlock:block] autorelease];
+	NSThread *thread = [[NSThread alloc] initWithBlock:block];
 	[thread start];
 	return thread;
 }
 
 - (id)initWithBlock:(void (^)())block
 {
-	NGThreadBlock *threadBlock = [[[NGThreadBlock alloc] init] autorelease];
+	NGThreadBlock *threadBlock = [[NGThreadBlock alloc] init];
 	
 	threadBlock->mBlock = [block copy];
 	

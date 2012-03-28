@@ -37,16 +37,6 @@
  *
  *
  */
-- (void)dealloc
-{
-	[mSearch release];
-	[super dealloc];
-}
-
-/**
- *
- *
- */
 - (id)copyWithZone:(NSZone *)zone
 {
 	ToolbarSearchItem *copy = [[[self class] allocWithZone:zone] init];

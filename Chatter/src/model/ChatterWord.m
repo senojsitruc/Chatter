@@ -18,7 +18,7 @@
  */
 + (id)word
 {
-	return [[[[self class] alloc] init] autorelease];
+	return [[[self class] alloc] init];
 }
 
 /**
@@ -34,16 +34,6 @@
 	}
 	
 	return self;
-}
-
-/**
- *
- *
- */
-- (void)dealloc
-{
-	[mWord release];
-	[super dealloc];
 }
 
 @end

@@ -40,7 +40,7 @@ extern NSString * const DBConnectionNoSuchStatementException;
 /**
  *
  */
-- (BOOL)exec:(DBStatement *)statement result:(DBResult **)result;
+- (DBResult *)exec:(DBStatement *)statement;
 
 /**
  *

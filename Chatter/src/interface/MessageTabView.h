@@ -24,6 +24,6 @@ typedef void (^MessageTabViewPressed) (MessageTabView*);
 }
 
 @property (readwrite, assign) BOOL isSelected;
-@property (readwrite, assign) MessageTabViewPressed handler;
+@property (readwrite, strong) MessageTabViewPressed handler;
 
 @end

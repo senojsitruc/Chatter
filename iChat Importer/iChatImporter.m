@@ -54,7 +54,6 @@ done_good:
 	retval = TRUE;
 	
 done_fail:
-	[fileManager release];
 	return retval;
 }
 
@@ -106,17 +105,15 @@ done_fail:
 	BOOL isDir = FALSE;
 	NSFileManager *fileManager = [[NSFileManager alloc] init];
 	
-	if (![fileManager fileExistsAtPath:filePath isDirectory:&isDir] || isDir) {
-		[fileManager release];
+	if (![fileManager fileExistsAtPath:filePath isDirectory:&isDir] || isDir)
 		return FALSE;
-	}
 	
-	__block NSMutableArray *messages = [NSMutableArray array];
+	NSMutableArray *messages = [NSMutableArray array];
 	__block NSTimeInterval lastTimestamp = 0.;
 	
 	serviceName = [serviceNames objectAtIndex:0];
 	
-	return [self importData:[NSData dataWithContentsOfFile:filePath] withMessageClass:messageClass andHandler:(^ (id<ServiceImporterMessage> message, BOOL *stop) {
+	[self importData:[NSData dataWithContentsOfFile:filePath] withMessageClass:messageClass andHandler:(^ (id<ServiceImporterMessage> message, BOOL *stop) {
 		if ([message screenname] == nil)
 			[message setScreenname:serviceName];
 		
@@ -157,8 +154,6 @@ done_fail:
 		[messages removeAllObjects];
 	}
 	
-	[fileManager release];
-	
 	return TRUE;
 }
 
@@ -176,40 +171,37 @@ done_fail:
 	NSArray *chat = [NSKeyedUnarchiver unarchiveObjectWithData:data];
 	NSArray *messages = [chat objectAtIndex:2];
 	NSString *remotesn = ((Presentity *)[[chat objectAtIndex:3] objectAtIndex:0]).senderID;
-	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
 	
-	for (NSObject *object in messages) {
-		if ([object isKindOfClass:[InstantMessage class]]) {
-			if ([[((InstantMessage *)object).text string] length] == 0)
-				continue;
-			
-			InstantMessage *im = (InstantMessage *)object;
-			NSUInteger flags = im.flags;
-			BOOL incoming = TRUE;
-			id<ServiceImporterMessage> message = [[(Class)messageClass alloc] init];
-			BOOL stop = FALSE;
-			
-			if ((flags & kFlagsAway1) || (flags & kFlagsAway2))
-				continue;
-			else if (flags & kFlagsDirection)
-				incoming = FALSE;
-			
-			if (incoming)
-				[message setScreenname:[remotesn lowercaseString]];
-			
-			[message setTimestamp:im.date];
-			[message setMessage:[[im.text string] stringByTrimmingTrailingCharactersInSet:[NSCharacterSet newlineCharacterSet]]];
-			
-			handler(message, &stop);
-			
-			if (stop)
-				break;
-			
-			[message release];
+	@autoreleasepool {
+		for (NSObject *object in messages) {
+			if ([object isKindOfClass:[InstantMessage class]]) {
+				if ([[((InstantMessage *)object).text string] length] == 0)
+					continue;
+				
+				InstantMessage *im = (InstantMessage *)object;
+				NSUInteger flags = im.flags;
+				BOOL incoming = TRUE;
+				id<ServiceImporterMessage> message = [[(Class)messageClass alloc] init];
+				BOOL stop = FALSE;
+				
+				if ((flags & kFlagsAway1) || (flags & kFlagsAway2))
+					continue;
+				else if (flags & kFlagsDirection)
+					incoming = FALSE;
+				
+				if (incoming)
+					[message setScreenname:[remotesn lowercaseString]];
+				
+				[message setTimestamp:im.date];
+				[message setMessage:[[im.text string] stringByTrimmingTrailingCharactersInSet:[NSCharacterSet newlineCharacterSet]]];
+				
+				handler(message, &stop);
+				
+				if (stop)
+					break;
+			}
 		}
 	}
-	
-	[pool release];
 	
 	return TRUE;
 }

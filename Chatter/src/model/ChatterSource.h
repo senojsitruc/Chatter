@@ -20,10 +20,10 @@
 	NSData *mAlias;
 }
 
-@property (readwrite, retain) NSString *service;
-@property (readwrite, retain) NSString *filePath;
-@property (readwrite, retain) NSDate *timestamp;
-@property (readwrite, retain) NSString *timestampStr;
+@property (readwrite, strong) NSString *service;
+@property (readwrite, strong) NSString *filePath;
+@property (readwrite, strong) NSDate *timestamp;
+@property (readwrite, strong) NSString *timestampStr;
 @property (readonly) AliasHandle aliasHandle;
 
 + (id)source;

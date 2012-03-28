@@ -139,7 +139,7 @@
 - (BOOL)initDatabaseCreate
 {
 	NSError *error;
-	NSFileManager *fileManager = [[[NSFileManager alloc] init] autorelease];
+	NSFileManager *fileManager = [[NSFileManager alloc] init];
 	NSString *dstDir = [[Easy pathToApplicationSupportDirectory] stringByAppendingPathComponent:@"Chatter"];
 	NSString *dbSrcPath = [[NSBundle mainBundle] pathForResource:@"default" ofType:@"db"];
 	NSString *dbDstPath = [dstDir stringByAppendingPathComponent:@"default.db"];
@@ -184,14 +184,12 @@
 	// update the database schema if it is out-of-date
 	if (FALSE == [dbconn verify:error]) {
 		NSLog(@"%s.. failed to verify the database", __PRETTY_FUNCTION__);
-		[dbconn release];
 		return FALSE;
 	}
 	
 	// attempt to connect to the database
 	if (FALSE == [dbconn connect]) {
 		NSLog(@"%s.. failed to connect", __PRETTY_FUNCTION__);
-		[dbconn release];
 		return FALSE;
 	}
 	
@@ -236,58 +234,58 @@
  */
 - (void)initDatabaseLoadThread
 {
-	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-	ChatterObjectCache *objectCache = [ChatterObjectCache sharedInstance];
+	@autoreleasepool {
+		ChatterObjectCache *objectCache = [ChatterObjectCache sharedInstance];
+		
+		BOOL (^handler)(ChatterObject*) = ^ BOOL (ChatterObject *cobject) {
+			[objectCache addObject:cobject];
+			mDatabaseLoadCount += 1;
+			return TRUE;
+		};
+		
+		// object count
+		mDatabaseTotalCount += [ChatterAccount dbobjectSelectCount];
+		mDatabaseTotalCount += [ChatterMessage dbobjectSelectCount];
+		mDatabaseTotalCount += [ChatterPerson dbobjectSelectCount];
+		mDatabaseTotalCount += [ChatterSession dbobjectSelectCount];
+		mDatabaseTotalCount += [ChatterSetting dbobjectSelectCount];
+		mDatabaseTotalCount += [ChatterSource dbobjectSelectCount];
+		mDatabaseTotalCount += [ChatterWord dbobjectSelectCount];
+		
+		// accounts
+		mDatabaseLoadType = @"accounts";
+		[ChatterAccount dbobjectSelectAllWithHandler:(BOOL (^)(ChatterAccount*))handler];
+		
+		// persons
+		mDatabaseLoadType = @"persons";
+		[ChatterPerson dbobjectSelectAllWithHandler:(BOOL (^)(ChatterPerson*))handler];
+		
+		// sessions
+		mDatabaseLoadType = @"sessions";
+		[ChatterSession dbobjectSelectAllWithHandler:(BOOL (^)(ChatterSession*))handler];
+		
+		// settings
+		mDatabaseLoadType = @"settings";
+		[ChatterSetting dbobjectSelectAllWithHandler:(BOOL (^)(ChatterSetting*))handler];
+		
+		// sources
+		mDatabaseLoadType = @"sources";
+		[ChatterSource dbobjectSelectAllWithHandler:(BOOL (^)(ChatterSource*))handler];
+		
+		// words
+		mDatabaseLoadType = @"words";
+		[ChatterWord dbobjectSelectAllWithHandler:(BOOL (^)(ChatterWord*))handler];
+		
+		// messages
+		mDatabaseLoadType = @"messages";
+		[ChatterMessage dbobjectSelectAllWithHandler:(BOOL (^)(ChatterMessage*))handler];
+		
+		mDatabaseLoadDone = TRUE;
+		mDatabaseLoadType = nil;
+		
+		[self performSelectorOnMainThread:@selector(initDatabaseShowConversations) withObject:nil waitUntilDone:FALSE];
 	
-	BOOL (^handler)(ChatterObject*) = ^ BOOL (ChatterObject *cobject) {
-		[objectCache addObject:cobject];
-		mDatabaseLoadCount += 1;
-		return TRUE;
-	};
-	
-	// object count
-	mDatabaseTotalCount += [ChatterAccount dbobjectSelectCount];
-	mDatabaseTotalCount += [ChatterMessage dbobjectSelectCount];
-	mDatabaseTotalCount += [ChatterPerson dbobjectSelectCount];
-	mDatabaseTotalCount += [ChatterSession dbobjectSelectCount];
-	mDatabaseTotalCount += [ChatterSetting dbobjectSelectCount];
-	mDatabaseTotalCount += [ChatterSource dbobjectSelectCount];
-	mDatabaseTotalCount += [ChatterWord dbobjectSelectCount];
-	
-	// accounts
-	mDatabaseLoadType = @"accounts";
-	[ChatterAccount dbobjectSelectAllWithHandler:(BOOL (^)(ChatterAccount*))handler];
-	
-	// persons
-	mDatabaseLoadType = @"persons";
-	[ChatterPerson dbobjectSelectAllWithHandler:(BOOL (^)(ChatterPerson*))handler];
-	
-	// sessions
-	mDatabaseLoadType = @"sessions";
-	[ChatterSession dbobjectSelectAllWithHandler:(BOOL (^)(ChatterSession*))handler];
-	
-	// settings
-	mDatabaseLoadType = @"settings";
-	[ChatterSetting dbobjectSelectAllWithHandler:(BOOL (^)(ChatterSetting*))handler];
-	
-	// sources
-	mDatabaseLoadType = @"sources";
-	[ChatterSource dbobjectSelectAllWithHandler:(BOOL (^)(ChatterSource*))handler];
-	
-	// words
-	mDatabaseLoadType = @"words";
-	[ChatterWord dbobjectSelectAllWithHandler:(BOOL (^)(ChatterWord*))handler];
-	
-	// messages
-	mDatabaseLoadType = @"messages";
-	[ChatterMessage dbobjectSelectAllWithHandler:(BOOL (^)(ChatterMessage*))handler];
-	
-	mDatabaseLoadDone = TRUE;
-	mDatabaseLoadType = nil;
-	
-	[self performSelectorOnMainThread:@selector(initDatabaseShowConversations) withObject:nil waitUntilDone:FALSE];
-	
-	[pool release];
+	}
 }
 
 /**
@@ -296,7 +294,6 @@
  */
 - (void)initDatabaseShowConversations
 {
-	NSFileManager *fileManager = [[NSFileManager alloc] init];
 	NSMutableArray *csettings = [[NSMutableArray alloc] init];
 	ChatterObjectCache *cache = [ChatterObjectCache sharedInstance];
 	
@@ -309,6 +306,7 @@
 		[self doActionShowConversation:[cache sessionForName:csetting.valueString] showMessage:nil];
 		
 		/*
+		NSFileManager *fileManager = [[NSFileManager alloc] init];
 		if (FALSE == [fileManager fileExistsAtPath:filePath])
 			[ChatterSetting dbobjectDeleteForName:@"Conversation" andValue:filePath];
 		else if (nil == (csession = [cache sourceForPath:filePath]))
@@ -318,8 +316,6 @@
 		*/
 	}
 	
-	[csettings release];
-	[fileManager release];
 }
 
 /**
@@ -340,7 +336,7 @@
 		return;
 	}
 	
-	NSString *type = [mDatabaseLoadType retain];
+	NSString *type = mDatabaseLoadType;
 	
 	if (type == nil)
 		[mProgressSheetController setSubtitle:[NSString stringWithFormat:@"Loading", mDatabaseLoadCount]];
@@ -348,8 +344,6 @@
 		[mProgressSheetController setPercent:((double)mDatabaseLoadCount / (double)mDatabaseTotalCount)];
 		[mProgressSheetController setSubtitle:[NSString stringWithFormat:@"Loading %@", type]];
 	}
-	
-	[type release];
 }
 
 /**
@@ -550,33 +544,33 @@
  */
 - (void)doActionShowConversation:(ChatterSession *)csession showMessage:(ChatterMessage *)cmessage
 {
-	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-	ConversationController *conversation = [mConversations objectForKey:csession];
-	ChatterObjectCache *cache = [ChatterObjectCache sharedInstance];
-	
-	if (conversation == nil) {
-		NSMutableArray *messages = [NSMutableArray array];
-		NSMutableIndexSet *messageIds = [NSMutableIndexSet indexSet];
+	@autoreleasepool {
+		ConversationController *conversation = [mConversations objectForKey:csession];
+		ChatterObjectCache *cache = [ChatterObjectCache sharedInstance];
 		
-		[ChatterMessage dbobjectSelectIDsForSessionId:csession.databaseId withHandler:(^ BOOL (NSUInteger messageId) {
-			[messageIds addIndex:messageId];
-			return TRUE;
-		})];
+		if (conversation == nil) {
+			NSMutableArray *messages = [NSMutableArray array];
+			NSMutableIndexSet *messageIds = [NSMutableIndexSet indexSet];
+			
+			[ChatterMessage dbobjectSelectIDsForSessionId:csession.databaseId withHandler:(^ BOOL (NSUInteger messageId) {
+				[messageIds addIndex:messageId];
+				return TRUE;
+			})];
+			
+			[messageIds enumerateIndexesUsingBlock:(^ (NSUInteger messageId, BOOL *stop) {
+				[messages addObject:[cache messageForId:messageId]];
+			})];
+			
+			conversation = [[ConversationController alloc] initWithMessages:messages];
+			conversation.session = csession;
+			
+			[ChatterSetting dbobjectInsertSettingWithName:@"Conversation" andValue:csession.name];
+			
+			[mConversations setObject:conversation forKey:csession];
+		}
 		
-		[messageIds enumerateIndexesUsingBlock:(^ (NSUInteger messageId, BOOL *stop) {
-			[messages addObject:[cache messageForId:messageId]];
-		})];
-		
-		conversation = [[ConversationController alloc] initWithMessages:messages];
-		conversation.session = csession;
-		
-		[ChatterSetting dbobjectInsertSettingWithName:@"Conversation" andValue:csession.name];
-		
-		[mConversations setObject:conversation forKey:csession];
+		[conversation show:cmessage];
 	}
-	
-	[conversation show:cmessage];
-	[pool release];
 }
 
 /**
@@ -640,7 +634,7 @@
 - (NSToolbarItem*)toolbar:(NSToolbar*)toolbar itemForItemIdentifier:(NSString*)str willBeInsertedIntoToolbar:(BOOL)flag
 {
 	if ([str isEqualToString:@"ChatterSearch"]) {
-		ToolbarSearchItem *searchItem = [[[ToolbarSearchItem alloc] initWithItemIdentifier:@"ChatterSearch"] autorelease];
+		ToolbarSearchItem *searchItem = [[ToolbarSearchItem alloc] initWithItemIdentifier:@"ChatterSearch"];
 		
 		[searchItem setLabel:@"Search"];
 		[searchItem setPaletteLabel:@"Search"];
@@ -648,7 +642,7 @@
 		return searchItem;
 	}
 	else if ([str isEqualToString:@"ChatterImportItemIdentifier"]) {
-		NSToolbarItem *toolbarItem = [[[NSToolbarItem alloc] initWithItemIdentifier:str] autorelease];
+		NSToolbarItem *toolbarItem = [[NSToolbarItem alloc] initWithItemIdentifier:str];
 		
 		[toolbarItem setLabel:@"Import"];
 		[toolbarItem setPaletteLabel:@"Import"];
@@ -662,7 +656,7 @@
 		return toolbarItem;
 	}
 	else if ([str isEqualToString:@"ChatterExportItemIdentifier"]) {
-		NSToolbarItem *toolbarItem = [[[NSToolbarItem alloc] initWithItemIdentifier:str] autorelease];
+		NSToolbarItem *toolbarItem = [[NSToolbarItem alloc] initWithItemIdentifier:str];
 		
 		[toolbarItem setLabel:@"Export"];
 		[toolbarItem setPaletteLabel:@"Export"];
@@ -673,7 +667,7 @@
 		return toolbarItem;
 	}
 	else if ([str isEqualToString:@"ChatterStatsItemIdentifier"]) {
-		NSToolbarItem *toolbarItem = [[[NSToolbarItem alloc] initWithItemIdentifier:str] autorelease];
+		NSToolbarItem *toolbarItem = [[NSToolbarItem alloc] initWithItemIdentifier:str];
 		
 		[toolbarItem setLabel:@"Statistics"];
 		[toolbarItem setPaletteLabel:@"Statistics"];
@@ -684,7 +678,7 @@
 		return toolbarItem;
 	}
 	else if ([str isEqualToString:@"ChatterFeedbackItemIdentifier"]) {
-		NSToolbarItem *toolbarItem = [[[NSToolbarItem alloc] initWithItemIdentifier:str] autorelease];
+		NSToolbarItem *toolbarItem = [[NSToolbarItem alloc] initWithItemIdentifier:str];
 		
 		[toolbarItem setLabel:@"Feedback"];
 		[toolbarItem setPaletteLabel:@"Feedback"];
@@ -698,7 +692,7 @@
 		return toolbarItem;
 	}
 	else if ([str isEqualToString:@"ChatterUpdateItemIdentifier"]) {
-		NSToolbarItem *toolbarItem = [[[NSToolbarItem alloc] initWithItemIdentifier:str] autorelease];
+		NSToolbarItem *toolbarItem = [[NSToolbarItem alloc] initWithItemIdentifier:str];
 		
 		[toolbarItem setLabel:@"Update"];
 		[toolbarItem setPaletteLabel:@"Update"];
@@ -712,7 +706,7 @@
 		return toolbarItem;
 	}
 	else if ([str isEqualToString:@"ChatterPrefsItemIdentifier"]) {
-		NSToolbarItem *toolbarItem = [[[NSToolbarItem alloc] initWithItemIdentifier:str] autorelease];
+		NSToolbarItem *toolbarItem = [[NSToolbarItem alloc] initWithItemIdentifier:str];
 		
 		[toolbarItem setLabel:@"Preferences"];
 		[toolbarItem setPaletteLabel:@"Preferences"];

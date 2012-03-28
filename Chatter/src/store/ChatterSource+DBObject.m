@@ -40,7 +40,7 @@
 	
 	@synchronized (connection) {
 		// execute statement
-		if (![connection exec:statement result:&result])
+		if (!(result = [connection exec:statement]))
 			DBOBJ_ERROR(statement,retval,done);
 		
 		// handle result
@@ -75,10 +75,10 @@
 	
 	@synchronized (connection) {
 		// execute statement
-		if (![connection exec:statement result:&result])
+		if (!(result = [connection exec:statement]))
 			DBOBJ_ERROR(statement,retval,done);
 		
-		[result getUint32:&count atColumn:0];
+		count = [result getUint32AtColumn:0];
 		
 	done:
 		[statement clear];
@@ -120,7 +120,7 @@
 		}
 		
 		// execute statement
-		if (![connection exec:statement result:&result])
+		if (!(result = [connection exec:statement]))
 			DBOBJ_ERROR(statement,retval,done);
 		
 		// get primary key
@@ -168,7 +168,7 @@
 		}
 		
 		// execute statement
-		if (![connection exec:statement result:&result])
+		if (!(result = [connection exec:statement]))
 			DBOBJ_ERROR(statement,retval,done);
 		
 	done:
@@ -206,10 +206,8 @@
 		[statement bindUint32:mDatabaseId atIndex:1];
 		
 		// execute statement
-		if (![connection exec:statement result:&result])
+		if (!(result = [connection exec:statement]))
 			DBOBJ_ERROR(statement,retval,done);
-		
-		[[self retain] autorelease];
 		
 	done:
 		[statement clear];
@@ -230,11 +228,10 @@
  */
 - (ChatterSource *)__dbobjectHandleResult:(DBResult *)result
 {
-	[result getUint32:&mDatabaseId atColumn:0];
-	[result getString:&mService atColumn:1];
-	[result getString:&mFilePath atColumn:2];
-	// TODO: alias handle blob
-	[result getString:&mTimestampStr atColumn:4];
+	mDatabaseId = [result getUint32AtColumn:0];
+	mService = [result getStringAtColumn:1];
+	mFilePath = [result getStringAtColumn:2];
+	mTimestampStr = [result getStringAtColumn:4];
 	
 	return self;
 }

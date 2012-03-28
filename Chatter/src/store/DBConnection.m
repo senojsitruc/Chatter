@@ -29,16 +29,6 @@ NSString * const DBConnectionNoSuchStatementException = @"DBConnectionNoSuchStat
 	return self;
 }
 
-/**
- *
- *
- */
-- (void)dealloc
-{
-	[mStatements release];
-	[super dealloc];
-}
-
 
 
 
@@ -85,9 +75,9 @@ NSString * const DBConnectionNoSuchStatementException = @"DBConnectionNoSuchStat
  *
  *
  */
-- (BOOL)exec:(DBStatement *)statement result:(DBResult **)result
+- (DBResult *)exec:(DBStatement *)statement
 {
-	return FALSE;
+	return nil;
 }
 
 /**

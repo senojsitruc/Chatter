@@ -25,20 +25,6 @@
  *
  *
  */
-- (void)dealloc
-{
-	self.window = nil;
-	self.titleTxt = nil;
-	self.progress = nil;
-	self.subtitleTxt = nil;
-	
-	[super dealloc];
-}
-
-/**
- *
- *
- */
 - (void)awakeFromNib
 {
 	mIsIndeterminate = TRUE;

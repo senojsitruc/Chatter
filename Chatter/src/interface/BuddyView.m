@@ -56,19 +56,6 @@
 	return self;
 }
 
-/**
- *
- *
- */
-- (void)dealloc
-{
-	[mIconImg release];
-	[mNameTxt release];
-	[mAccount release];
-	
-	[super dealloc];
-}
-
 
 
 
@@ -118,7 +105,7 @@
 		item.target = self;
 	}
 	
-	return [menu autorelease];
+	return menu;
 }
 
 
@@ -136,11 +123,8 @@
 	if (mAccount == caccount)
 		return;
 	
-	[mPerson release];
 	mPerson = nil;
-	
-	[mAccount release];
-	mAccount = [caccount retain];
+	mAccount = caccount;
 	
 	mIconImg.image = caccount.image;
 	/*
@@ -162,11 +146,8 @@
 	if (mPerson == cperson)
 		return;
 	
-	[mAccount release];
 	mAccount = nil;
-	
-	[mPerson release];
-	mPerson = [cperson retain];
+	mPerson = cperson;
 	
 	mIconImg.image = cperson.image;
 	
@@ -206,7 +187,7 @@
  */
 - (void)doActionDelete:(id)sender
 {
-	NSAlert *alert = [[[NSAlert alloc] init] autorelease];
+	NSAlert *alert = [[NSAlert alloc] init];
 	NSString *name;
 	
 	if (mAccount)

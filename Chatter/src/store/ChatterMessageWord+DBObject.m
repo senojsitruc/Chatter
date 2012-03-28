@@ -43,7 +43,7 @@
 		}
 		
 		// execute statement
-		[connection exec:statement result:&result];
+		result = [connection exec:statement];
 		
 	done:
 		[statement clear];
@@ -79,12 +79,12 @@
 		}
 		
 		// execute statement
-		if (![connection exec:statement result:&result])
+		if (!(result = [connection exec:statement]))
 			DBOBJ_ERROR(statement,retval,done);
 		
 		// handle result
 		while (![result isDone]) {
-			[result getUint32:&messageId atColumn:0];
+			messageId = [result getUint32AtColumn:0];
 			
 			if (FALSE == handler(messageId))
 				break;

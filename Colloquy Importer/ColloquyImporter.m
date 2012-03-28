@@ -119,7 +119,6 @@ done_good:
 	retval = TRUE;
 	
 done_fail:
-	[fileManager release];
 	return retval;
 }
 
@@ -142,15 +141,6 @@ done_fail:
  *
  *
  */
-- (void)dealloc
-{
-	[mXmlStr release];
-	[mMessage release];
-	[mSender release];
-	[mTimestamp release];
-	
-	[super dealloc];
-}
 
 
 
@@ -198,11 +188,9 @@ done_fail:
 	NSFileManager *fileManager = [[NSFileManager alloc] init];
 	
 	if (![fileManager fileExistsAtPath:filePath isDirectory:&isDir] || isDir) {
-		[fileManager release];
 		return FALSE;
 	}
 	
-	[fileManager release];
 	
 	return [self importData:[NSData dataWithContentsOfFile:filePath] withMessageClass:messageClass andHandler:handler];
 }
@@ -213,25 +201,23 @@ done_fail:
  */
 - (BOOL)importData:(NSData *)fileData withMessageClass:(Class<ServiceImporterMessage>)messageClass andHandler:(ServiceImporterMessageCallback)handler
 {
-	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-	NSMutableData *xmlData = [NSMutableData data];
-	NSXMLParser *parser;
-	
-	[xmlData appendBytes:"<?xml version=\"1.0\" encoding=\"UTF-8\" ?><chat>" length:45];
-	[xmlData appendBytes:[fileData bytes] length:[fileData length]];
-	
-	parser = [[NSXMLParser alloc] initWithData:xmlData];
-	
-	mHandler = handler;
-	mMessageClass = messageClass;
-	
-	[parser setDelegate:self];
-	[parser parse];
-	[parser release];
-	
-	mHandler = nil;
-	
-	[pool release];
+	@autoreleasepool {
+		NSMutableData *xmlData = [NSMutableData data];
+		NSXMLParser *parser;
+		
+		[xmlData appendBytes:"<?xml version=\"1.0\" encoding=\"UTF-8\" ?><chat>" length:45];
+		[xmlData appendBytes:[fileData bytes] length:[fileData length]];
+		
+		parser = [[NSXMLParser alloc] initWithData:xmlData];
+		
+		mHandler = handler;
+		mMessageClass = messageClass;
+		
+		[parser setDelegate:self];
+		[parser parse];
+		
+		mHandler = nil;
+	}
 	
 	return TRUE;
 }
@@ -280,13 +266,11 @@ done_fail:
 			else if (mInMessage) {
 			}
 			else if ([elementName isEqualToString:@"sender"]) {
-				[mSender release];
-				mSender = [[attributeDict objectForKey:@"identifier"] retain];
+				mSender = [attributeDict objectForKey:@"identifier"];
 				mInSender = TRUE;
 			}
 			else if ([elementName isEqualToString:@"message"]) {
-				[mTimestamp release];
-				mTimestamp = [[attributeDict objectForKey:@"received"] retain];
+				mTimestamp = [attributeDict objectForKey:@"received"];
 				mInMessage = TRUE;
 			}
 		}
@@ -309,10 +293,8 @@ done_fail:
 		else if ([elementName isEqualToString:@"envelope"])
 			mInEnvelope = TRUE;
 		else if ([elementName isEqualToString:@"event"]) {
-			[mEvent release];
-			mEvent = [[attributeDict objectForKey:@"name"] retain];
-			[mTimestamp release];
-			mTimestamp = [[attributeDict objectForKey:@"occurred"] retain];
+			mEvent = [attributeDict objectForKey:@"name"];
+			mTimestamp = [attributeDict objectForKey:@"occurred"];
 			mInEvent = TRUE;
 		}
 	}
@@ -345,27 +327,16 @@ done_fail:
 					
 					if (stop)
 						[parser abortParsing];
-					
-					[message release];
 				}
 				
 				[mXmlStr setString:@""];
-				
-				[mMessage release];
 				mMessage = nil;
-				
 				mInMessage = FALSE;
 			}
 			else if ([elementName isEqualToString:@"envelope"]) {
-				[mSender release];
 				mSender = nil;
-				
-				[mTimestamp release];
 				mTimestamp = nil;
-				
-				[mMessage release];
 				mMessage = nil;
-				
 				mInEnvelope = FALSE;
 			}
 		}
@@ -377,15 +348,13 @@ done_fail:
 					mInSpan = FALSE;
 				}
 				else if ([elementName isEqualToString:@"message"]) {
-					[mMessage release];
-					mMessage = [[NSString stringWithString:mXmlStr] retain];
+					mMessage = [NSString stringWithString:mXmlStr];
 					[mXmlStr setString:@""];
 					mInMessage = FALSE;
 				}
 			}
 			else if (mInWho && [elementName isEqualToString:@"who"]) {
-				[mSender release];
-				mSender = [[NSString stringWithString:mXmlStr] retain];
+				mSender = [NSString stringWithString:mXmlStr];
 				[mXmlStr setString:@""];
 				mInWho = FALSE;
 			}
@@ -404,15 +373,10 @@ done_fail:
 					
 					if (stop)
 						[parser abortParsing];
-					
-					[message release];
 				}
 				
 				[mXmlStr setString:@""];
-				
-				[mMessage release];
 				mMessage = nil;
-				
 				mInEvent = FALSE;
 			}
 		}

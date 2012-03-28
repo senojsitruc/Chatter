@@ -37,15 +37,11 @@
  */
 - (void)dealloc
 {
-	[mFileName release];
-	
 	// cleanly disconnect from the database
 	if (mConn != NULL) {
 		sqlite3_close(mConn);
 		mConn = NULL;
 	}
-	
-	[super dealloc];
 }
 
 
@@ -297,19 +293,21 @@ done:
  *
  *
  */
-- (BOOL)exec:(DBStatement *)_statement result:(DBResult **)_result
+- (DBResult *)exec:(DBStatement *)_statement
 {
 	SQLiteDBStatement *statement = (SQLiteDBStatement*)_statement;
-	SQLiteDBResult **result = (SQLiteDBResult **)_result;
 	
 	if (statement->mStmt == NULL) {
 		NSLog(@"%s.. [%@] prepared statement is unprepared", __PRETTY_FUNCTION__, statement.name);
-		return FALSE;
+		return nil;
 	}
 	
-	*result = [[[SQLiteDBResult alloc] initWithStatement:statement] autorelease];
+	SQLiteDBResult *result = [[SQLiteDBResult alloc] initWithStatement:statement];
 	
-	return [*result next];
+	if ([result next])
+		return result;
+	else
+		return nil;
 }
 
 /**

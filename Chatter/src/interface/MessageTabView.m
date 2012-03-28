@@ -28,11 +28,6 @@
 	return self;
 }
 
-- (void)awakeFromNib
-{
-	[mLabel retain];
-}
-
 /**
  *
  *

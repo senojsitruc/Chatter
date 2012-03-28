@@ -64,14 +64,8 @@
  */
 - (void)dealloc
 {
-	[mMessage release];
-	[mMessageTxt release];
-	[mIconImg release];
-	
 	if (mBubbleColor != NULL)
 		CGColorRelease(mBubbleColor);
-	
-	[super dealloc];
 }
 
 
@@ -356,7 +350,7 @@
 	}
 	*/
 	
-	return [menu autorelease];
+	return menu;
 }
 
 
@@ -375,10 +369,8 @@
 		return;
 	
 	if (mMessage != cmessage) {
-		[mMessage release];
-		mMessage = [cmessage retain];
-		[mAccount release];
-		mAccount = [cmessage.account retain];
+		mMessage = cmessage;
+		mAccount = cmessage.account;
 	}
 	
 	CGFloat textWidth = cmessage.renderWidth;
@@ -461,7 +453,7 @@
 	
 	if (csource != nil) {
 		if (FALSE == [[NSFileManager defaultManager] fileExistsAtPath:csource.filePath]) {
-			NSAlert *alert = [[[NSAlert alloc] init] autorelease];
+			NSAlert *alert = [[NSAlert alloc] init];
 			
 			[alert addButtonWithTitle:@"Sorry"];
 			[alert setMessageText:@"The source file for this conversation could not be found."];
@@ -488,7 +480,7 @@
  */
 - (void)doActionDeleteConversation:(id)sender
 {
-	NSAlert *alert = [[[NSAlert alloc] init] autorelease];
+	NSAlert *alert = [[NSAlert alloc] init];
 	NSUInteger messageCount = [ChatterMessage dbobjectSelectCountForSessionId:mMessage.sessionId];
 	
 	[alert addButtonWithTitle:@"Delete"];

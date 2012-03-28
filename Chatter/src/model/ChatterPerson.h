@@ -21,11 +21,11 @@
 	NSMutableString *mFullName;
 }
 
-@property (readonly) NSString *name;
-@property (readwrite, retain) NSImage *image;
-@property (readwrite, retain) NSString *firstName;
-@property (readwrite, retain) NSString *lastName;
-@property (readwrite, retain) NSString *addressBookUid;
+@property (weak, readonly) NSString *name;
+@property (readwrite, strong) NSImage *image;
+@property (readwrite, strong) NSString *firstName;
+@property (readwrite, strong) NSString *lastName;
+@property (readwrite, strong) NSString *addressBookUid;
 
 + (id)person;
 

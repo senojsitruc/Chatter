@@ -26,7 +26,7 @@
  */
 + (id)setting
 {
-	return [[[[self class] alloc] init] autorelease];
+	return [[[self class] alloc] init];
 }
 
 /**
@@ -42,18 +42,6 @@
 	}
 	
 	return self;
-}
-
-/**
- *
- *
- */
-- (void)dealloc
-{
-	[mName release];
-	[mValue release];
-	
-	[super dealloc];
 }
 
 
@@ -80,10 +68,8 @@
  */
 - (void)setValueNumber:(NSInteger)value
 {
-	[mValue release];
 	mValue = nil;
-	
-	mValue = [[[NSNumber numberWithInteger:value] stringValue] retain];
+	mValue = [[NSNumber numberWithInteger:value] stringValue];
 }
 
 @end

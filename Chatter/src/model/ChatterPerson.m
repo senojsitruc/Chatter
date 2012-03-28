@@ -29,7 +29,7 @@
  */
 + (id)person
 {
-	return [[[[self class] alloc] init] autorelease];
+	return [[[self class] alloc] init];
 }
 
 /**
@@ -40,12 +40,6 @@
 {
 	self.firstName = nil;
 	self.lastName = nil;
-	self.addressBookUid = nil;
-	
-	[mFullName release];
-	[mImage release];
-	
-	[super dealloc];
 }
 
 
@@ -69,10 +63,7 @@
  */
 - (void)setFirstName:(NSString *)firstName
 {
-	[mFirstName release];
-	mFirstName = [firstName retain];
-	
-	[mFullName release];
+	mFirstName = firstName;
 	mFullName = nil;
 }
 
@@ -91,10 +82,7 @@
  */
 - (void)setLastName:(NSString *)lastName
 {
-	[mLastName release];
-	mLastName = [lastName retain];
-	
-	[mFullName release];
+	mLastName = lastName;
 	mFullName = nil;
 }
 
@@ -108,7 +96,7 @@
 		if (mFullName)
 			return mFullName;
 		else {
-			mFullName = [[NSMutableString string] retain];
+			mFullName = [NSMutableString string];
 			[mFullName appendString:mFirstName];
 			[mFullName appendString:@" "];
 			[mFullName appendString:mLastName];
@@ -148,7 +136,6 @@
 	if (imageData != nil) {
 		mImage = [[NSImage alloc] initWithData:imageData];
 		mImage.size = NSMakeSize(32., 32.);
-		[imageData release];
 	}
 	
 	return mImage;
@@ -169,8 +156,7 @@
 	NSString *filePath = [personImagesPath stringByAppendingPathComponent:[NSString stringWithFormat:@"%lu.png", mDatabaseId]];
 	NSFileManager *fileManager = [[NSFileManager alloc] init];
 	
-	[mImage release];
-	mImage = [image retain];
+	mImage = image;
 	
 	if (FALSE == [fileManager fileExistsAtPath:personImagesPath]) {
 		if (FALSE == [fileManager createDirectoryAtPath:personImagesPath withIntermediateDirectories:TRUE attributes:nil error:nil]) {
@@ -190,7 +176,6 @@
 		[data writeToFile:filePath atomically: NO];
 	}
 	
-	[fileManager release];
 }
 
 @end

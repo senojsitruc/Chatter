@@ -19,10 +19,10 @@
 	BOOL mIsIndeterminate;
 }
 
-@property (readwrite, retain) IBOutlet NSWindow *window;
-@property (readwrite, retain) IBOutlet NSTextField *titleTxt;
-@property (readwrite, retain) IBOutlet NSProgressIndicator *progress;
-@property (readwrite, retain) IBOutlet NSTextField *subtitleTxt;
+@property (readwrite, strong) IBOutlet NSWindow *window;
+@property (readwrite, strong) IBOutlet NSTextField *titleTxt;
+@property (readwrite, strong) IBOutlet NSProgressIndicator *progress;
+@property (readwrite, strong) IBOutlet NSTextField *subtitleTxt;
 
 - (void)showInWindow:(NSWindow *)window;
 - (void)hide;

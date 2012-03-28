@@ -14,6 +14,6 @@
 	NSString *mImageFilePath;
 }
 
-@property (readwrite, retain) NSString *imageFilePath;
+@property (readwrite, strong) NSString *imageFilePath;
 
 @end

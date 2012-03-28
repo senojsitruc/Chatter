@@ -235,16 +235,6 @@ getString (offset RecordEnd)
 	return self;
 }
 
-/**
- *
- *
- */
-- (void)dealloc
-{
-	[mMessage release];
-	[super dealloc];
-}
-
 
 
 
@@ -291,7 +281,6 @@ done_good:
 	retval = TRUE;
 	
 done_fail:
-	[fileManager release];
 	return retval;
 }
 
@@ -403,17 +392,17 @@ done_fail:
 					case 296: Label="Type"; break;
 					case 404: Label="User"; break;
 					case 408: Label="User"; break;
-					case 440: Label="Session"; handled=TRUE; [mSession release]; mSession = [getString(RecordEnd) retain]; break;
+					case 440: Label="Session"; handled=TRUE;  mSession = getString(RecordEnd); break;
 					case 456: Label="Members"; break; /* username */
 					case 460: Label="Members"; break;
 					case 468: Label="User"; break;
 					case 472: Label="Name"; break;
-					case 480: Label="Session"; handled=TRUE; [mSession release]; mSession = [getString(RecordEnd) retain]; break;
-					case 488: Label="Sender"; handled=TRUE; [mSender release]; mSender = [getString(RecordEnd) retain]; break;
+					case 480: Label="Session"; handled=TRUE;  mSession = getString(RecordEnd); break;
+					case 488: Label="Sender"; handled=TRUE;  mSender = getString(RecordEnd); break;
 					case 492: Label="Sender"; break; /* screenname */
 					case 500: Label="Recipient"; break;
-					case 508: Label="Message"; handled=TRUE; tmpMessage = (NSString *)CFXMLCreateStringByUnescapingEntities(NULL, (CFStringRef)getString(RecordEnd), NULL); if (tmpMessage) [mMessage appendString:tmpMessage]; break;
-					case 584: Label="Session"; handled=TRUE; [mSession release]; mSession = [getString(RecordEnd) retain]; break;
+					case 508: Label="Message"; handled=TRUE; tmpMessage = (__bridge_transfer NSString *)CFXMLCreateStringByUnescapingEntities(NULL, (__bridge CFStringRef)getString(RecordEnd), NULL); if (tmpMessage) [mMessage appendString:tmpMessage]; break;
+					case 584: Label="Session"; handled=TRUE;  mSession = getString(RecordEnd); break;
 					case 588: Label="Member"; break;
 					case 828: Label="User"; break;
 					case 840: Label="User"; break;
@@ -425,8 +414,7 @@ done_fail:
 						PrintString=0;
 						if (!mTimestamp /*!Time*/ && (Number > 1000000000))
 						{
-							[mTimestamp release];
-							mTimestamp = [[NSDate dateWithTimeIntervalSince1970:Number] retain];
+							mTimestamp = [NSDate dateWithTimeIntervalSince1970:Number];
 						}
 						break;
 				}
@@ -452,18 +440,11 @@ done_fail:
 			if (stop)
 				break;
 			
-			[message release];
 		}
 		
-		[mSession release];
 		mSession = nil;
-		
-		[mSender release];
 		mSender = nil;
-		
 		[mMessage setString:@""];
-		
-		[mTimestamp release];
 		mTimestamp = nil;
 	}
 	

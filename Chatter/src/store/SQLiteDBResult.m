@@ -22,7 +22,7 @@
 	
 	if (self) {
 		mIsDone = FALSE;
-		mStatement = (SQLiteDBStatement*)[statement retain];
+		mStatement = (SQLiteDBStatement*)statement;
 	}
 	
 	return self;
@@ -32,11 +32,6 @@
  *
  *
  */
-- (void)dealloc
-{
-	[mStatement release];
-	[super dealloc];
-}
 
 
 
@@ -81,117 +76,98 @@
  *
  *
  */
-- (BOOL)getString:(NSString **)value atColumn:(NSUInteger)column
+- (NSString *)getStringAtColumn:(NSUInteger)column
 {
+	NSString *value = nil;
 	const char *cstr;
-	
-	if (*value != nil) {
-		[*value release];
-		*value = nil;
-	}
 	
 	cstr = (const char *)sqlite3_column_text(mStatement->mStmt, (int)column);
 	
 	if (cstr != NULL)
-		*value = [[NSString alloc] initWithCString:cstr encoding:NSUTF8StringEncoding];
+		value = [[NSString alloc] initWithCString:cstr encoding:NSUTF8StringEncoding];
 	
-	return TRUE;
+	return value;
 }
 
 /**
  *
  *
  */
-- (BOOL)getBlob:(NSData **)value atColumn:(NSUInteger)column
+- (NSData *)getBlobAtColumn:(NSUInteger)column
 {
+	NSData *value = nil;
 	const void *data;
 	int length;
-	
-	if (*value != nil) {
-		[*value release];
-		*value = nil;
-	}
 	
 	data = sqlite3_column_blob(mStatement->mStmt, (int)column);
 	length = sqlite3_column_bytes(mStatement->mStmt, (int)column);
 	
 	if (data != NULL && length != 0)
-		*value = [[NSData alloc] initWithBytes:data length:length];
+		value = [[NSData alloc] initWithBytes:data length:length];
 	
-	return TRUE;
+	return value;
 }
 
 /**
  *
  *
  */
-- (BOOL)getDate:(NSDate **)value atColumn:(NSUInteger)column
+- (NSDate *)getDateAtColumn:(NSUInteger)column
 {
+	NSDate *value = nil;
 	NSString *string = nil;
 	
-	if (FALSE == [self getString:&string atColumn:column])
-		return FALSE;
+	string = [self getStringAtColumn:column];
 	
-	*value = [[NSDate dateWithString:string] retain];
+	if (string)
+		value = [NSDate dateWithString:string];
 	
-	[string release];
-	
-	return TRUE;
+	return value;
 }
 
 /**
  *
  *
  */
-- (BOOL)getInt32:(NSInteger *)value atColumn:(NSUInteger)column
+- (NSInteger)getInt32AtColumn:(NSUInteger)column
 {
-	*value = sqlite3_column_int(mStatement->mStmt, (int)column);
-	
-	return TRUE;
+	return sqlite3_column_int(mStatement->mStmt, (int)column);
 }
 
 /**
  *
  *
  */
-- (BOOL)getUint32:(NSUInteger *)value atColumn:(NSUInteger)column
+- (NSUInteger)getUint32AtColumn:(NSUInteger)column
 {
-	*value = sqlite3_column_int(mStatement->mStmt, (int)column);
-	
-	return TRUE;
+	return sqlite3_column_int(mStatement->mStmt, (int)column);
 }
 
 /**
  *
  *
  */
-- (BOOL)getUint64:(uint64_t *)value atColumn:(NSUInteger)column
+- (uint64_t)getUint64AtColumn:(NSUInteger)column
 {
-	*value = sqlite3_column_int64(mStatement->mStmt, (int)column);
-	
-	return TRUE;
+	return sqlite3_column_int64(mStatement->mStmt, (int)column);
 }
 
 /**
  *
  *
  */
-- (BOOL)getFloat:(float *)value atColumn:(NSUInteger)column
+- (float)getFloatAtColumn:(NSUInteger)column
 {
-	*value = (float)sqlite3_column_double(mStatement->mStmt, (int)column);
-	
-	return TRUE;
+	return (float)sqlite3_column_double(mStatement->mStmt, (int)column);
 }
 
 /**
  *
  *
  */
-- (BOOL)getDouble:(double *)value atColumn:(NSUInteger)column
+- (double)getDoubleAtColumn:(NSUInteger)column
 {
-	*value = sqlite3_column_double(mStatement->mStmt, (int)column);
-	
-	return TRUE;
+	return sqlite3_column_double(mStatement->mStmt, (int)column);
 }
 
 @end

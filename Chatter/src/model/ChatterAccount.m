@@ -31,7 +31,7 @@
  */
 + (id)account
 {
-	return [[[[self class] alloc] init] autorelease];
+	return [[[self class] alloc] init];
 }
 
 /**
@@ -53,14 +53,6 @@
  *
  *
  */
-- (void)dealloc
-{
-	[mScreenName release];
-	[mIconName release];
-	[mImage release];
-	
-	[super dealloc];
-}
 
 
 
@@ -89,12 +81,11 @@
 	if (imageData != nil) {
 		mImage = [[NSImage alloc] initWithData:imageData];
 		mImage.size = NSMakeSize(32., 32.);
-		[imageData release];
 	}
 	else {
 		image = [NSImage imageNamed:mIconName];
 		image.size = NSMakeSize(32., 32.);
-		mImage = [image retain];
+		mImage = image;
 	}
 	
 	return mImage;
@@ -115,8 +106,7 @@
 	NSString *filePath = [accountImagesPath stringByAppendingPathComponent:[NSString stringWithFormat:@"%lu.png", mDatabaseId]];
 	NSFileManager *fileManager = [[NSFileManager alloc] init];
 	
-	[mImage release];
-	mImage = [image retain];
+	mImage = image;
 	
 	if (FALSE == [fileManager fileExistsAtPath:accountImagesPath]) {
 		if (FALSE == [fileManager createDirectoryAtPath:accountImagesPath withIntermediateDirectories:TRUE attributes:nil error:nil]) {
@@ -136,7 +126,6 @@
 		[data writeToFile:filePath atomically: NO];
 	}
 	
-	[fileManager release];
 }
 
 /**

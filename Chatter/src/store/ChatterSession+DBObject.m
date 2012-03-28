@@ -40,7 +40,7 @@
 	
 	@synchronized (connection) {
 		// execute statement
-		if (![connection exec:statement result:&result])
+		if (!(result = [connection exec:statement]))
 			DBOBJ_ERROR(statement,retval,done);
 		
 		// handle result
@@ -75,10 +75,10 @@
 	
 	@synchronized (connection) {
 		// execute statement
-		if (![connection exec:statement result:&result])
+		if (!(result = [connection exec:statement]))
 			DBOBJ_ERROR(statement,retval,done);
 		
-		[result getUint32:&count atColumn:0];
+		count = [result getUint32AtColumn:0];
 		
 	done:
 		[statement clear];
@@ -124,7 +124,7 @@
 		}
 		
 		// execute statement
-		if (![connection exec:statement result:&result])
+		if (!(result = [connection exec:statement]))
 			DBOBJ_ERROR(statement,retval,done);
 		
 		// get primary key
@@ -176,7 +176,7 @@
 		}
 		
 		// execute statement
-		if (![connection exec:statement result:&result])
+		if (!(result = [connection exec:statement]))
 			DBOBJ_ERROR(statement,retval,done);
 		
 	done:
@@ -214,10 +214,9 @@
 		[statement bindUint32:mDatabaseId atIndex:1];
 		
 		// execute statement
-		if (![connection exec:statement result:&result])
+		if (!(result = [connection exec:statement]))
 			DBOBJ_ERROR(statement,retval,done);
 		
-		[[self retain] autorelease];
 		//[self.document __removeElement:self];
 		
 	done:
@@ -239,10 +238,10 @@
  */
 - (ChatterSession *)__dbobjectHandleResult:(DBResult *)result
 {
-	[result getUint32:&mDatabaseId atColumn:0];
-	[result getUint32:&mSourceId atColumn:1];
-	[result getString:&mName atColumn:2];
-	[result getString:&mTimestampStr atColumn:4];
+	mDatabaseId = [result getUint32AtColumn:0];
+	mSourceId = [result getUint32AtColumn:1];
+	mName = [result getStringAtColumn:2];
+	mTimestampStr = [result getStringAtColumn:3];
 	
 	return self;
 }

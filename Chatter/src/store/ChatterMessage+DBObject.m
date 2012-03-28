@@ -51,10 +51,10 @@
 		}
 		
 		// execute statement
-		if (![connection exec:statement result:&result])
+		if (!(result = [connection exec:statement]))
 			DBOBJ_ERROR(statement,retval,done);
 		
-		[result getUint32:&messageId atColumn:0];
+		messageId = [result getUint32AtColumn:0];
 		
 	done:
 		[statement clear];
@@ -90,10 +90,10 @@
 		}
 		
 		// execute statement
-		if (![connection exec:statement result:&result])
+		if (!(result = [connection exec:statement]))
 			DBOBJ_ERROR(statement,retval,done);
 		
-		[result getUint32:&count atColumn:0];
+		count = [result getUint32AtColumn:0];
 		
 	done:
 		[statement clear];
@@ -128,10 +128,8 @@
 		}
 		
 		// execute statement
-		if (![connection exec:statement result:&result])
+		if (!(result = [connection exec:statement]))
 			DBOBJ_ERROR(statement,retval,done);
-		
-		[[self retain] autorelease];
 		
 	done:
 		[statement clear];
@@ -168,10 +166,8 @@
 		[statement bindUint32:caccount.databaseId atIndex:1];
 		
 		// execute statement
-		if (![connection exec:statement result:&result])
+		if (!(result = [connection exec:statement]))
 			DBOBJ_ERROR(statement,retval,done);
-		
-		[[self retain] autorelease];
 		
 	done:
 		[statement clear];
@@ -208,10 +204,8 @@
 		[statement bindUint32:cperson.databaseId atIndex:1];
 		
 		// execute statement
-		if (![connection exec:statement result:&result])
+		if (!(result = [connection exec:statement]))
 			DBOBJ_ERROR(statement,retval,done);
-		
-		[[self retain] autorelease];
 		
 	done:
 		[statement clear];
@@ -243,7 +237,7 @@
 	
 	@synchronized (connection) {
 		// execute statement
-		if (![connection exec:statement result:&result])
+		if (!(result = [connection exec:statement]))
 			DBOBJ_ERROR(statement,retval,done);
 		
 		// handle result
@@ -283,12 +277,12 @@
 		}
 		
 		// execute statement
-		if (![connection exec:statement result:&result])
+		if (!(result = [connection exec:statement]))
 			DBOBJ_ERROR(statement,retval,done);
 		
 		// handle result
 		while (![result isDone]) {
-			[result getUint32:&messageId atColumn:0];
+			messageId = [result getUint32AtColumn:0];
 			
 			if (FALSE == handler(messageId))
 				break;
@@ -330,12 +324,12 @@
 		}
 		
 		// execute statement
-		if (![connection exec:statement result:&result])
+		if (!(result = [connection exec:statement]))
 			DBOBJ_ERROR(statement,retval,done);
 		
 		// handle result
 		while (![result isDone]) {
-			[result getUint32:&messageId atColumn:0];
+			messageId = [result getUint32AtColumn:0];
 			
 			if (FALSE == handler(messageId))
 				break;
@@ -377,12 +371,12 @@
 		}
 		
 		// execute statement
-		if (![connection exec:statement result:&result])
+		if (!(result = [connection exec:statement]))
 			DBOBJ_ERROR(statement,retval,done);
 		
 		// handle result
 		while (![result isDone]) {
-			[result getUint32:&databaseId atColumn:0];
+			databaseId = [result getUint32AtColumn:0];
 			
 			if (FALSE == handler(databaseId))
 				break;
@@ -419,10 +413,10 @@
 	
 	@synchronized (connection) {
 		// execute statement
-		if (![connection exec:statement result:&result])
+		if (!(result = [connection exec:statement]))
 			DBOBJ_ERROR(statement,retval,done);
 		
-		[result getUint32:&count atColumn:0];
+		count = [result getUint32AtColumn:0];
 		
 	done:
 		[statement clear];
@@ -477,7 +471,7 @@
 		}
 		
 		// execute statement
-		if (![connection exec:statement result:&result])
+		if (!(result = [connection exec:statement]))
 			DBOBJ_ERROR(statement,retval,done);
 		
 		// get primary key
@@ -538,7 +532,7 @@
 		}
 		
 		// execute statement
-		if (![connection exec:statement result:&result])
+		if (!(result = [connection exec:statement]))
 			DBOBJ_ERROR(statement,retval,done);
 		
 	done:
@@ -576,10 +570,8 @@
 		[statement bindUint32:mDatabaseId atIndex:1];
 		
 		// execute statement
-		if (![connection exec:statement result:&result])
+		if (!(result = [connection exec:statement]))
 			DBOBJ_ERROR(statement,retval,done);
-		
-		[[self retain] autorelease];
 		
 	done:
 		[statement clear];
@@ -601,14 +593,14 @@
  */
 - (ChatterMessage *)__dbobjectHandleResult:(DBResult *)result
 {
-	[result getUint32:&mDatabaseId atColumn:0];
-	[result getUint32:&mAccountId atColumn:1];
-	[result getUint32:&mSourceId atColumn:2];
-	[result getUint32:&mSessionId atColumn:3];
-	[result getString:&mTimestampStr atColumn:4];
-	[result getUint32:&mRenderHeight atColumn:5];
-	[result getUint32:&mRenderHeight atColumn:6];
-	[result getString:&mMessage atColumn:7];
+	mDatabaseId = [result getUint32AtColumn:0];
+	mAccountId = [result getUint32AtColumn:1];
+	mSourceId = [result getUint32AtColumn:2];
+	mSessionId = [result getUint32AtColumn:3];
+	mTimestampStr = [result getStringAtColumn:4];
+	mRenderWidth = [result getUint32AtColumn:5];
+	mRenderHeight = [result getUint32AtColumn:6];
+	mMessage = [result getStringAtColumn:7];
 	
 	return self;
 }

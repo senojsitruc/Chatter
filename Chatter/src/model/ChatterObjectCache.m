@@ -70,28 +70,6 @@ static ChatterObjectCache *gObjectCache;
 	return self;
 }
 
-/**
- *
- *
- */
-- (void)dealloc
-{
-	[mAccountsById release];
-	[mAccountsByName release];
-	[mMessagesById release];
-	[mPersonsById release];
-	[mSessionsById release];
-	[mSessionsByName release];
-	[mSettingsById release];
-	[mSettingsByName release];
-	[mSourcesById release];
-	[mSourcesByPath release];
-	[mWordsById release];
-	[mWordsByWord release];
-	
-	[super dealloc];
-}
-
 
 
 

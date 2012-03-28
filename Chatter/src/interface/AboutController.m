@@ -29,9 +29,6 @@
 		[mAboutTxt setEditable:FALSE];
 //	[mAboutTxt setSelectable:FALSE];
 		[[mAboutTxt textStorage] setAttributedString:content];
-		
-		[rtfData release];
-		[content release];
 	}
 	
 	// CFBundleIconFile (Chatter.icns)
@@ -72,9 +69,6 @@
 		[mAboutTxt setRichText:TRUE];
 		[mAboutTxt setEditable:FALSE];
 		[[mAboutTxt textStorage] setAttributedString:content];
-		
-		[rtfData release];
-		[content release];
 	}
 	
 	mIsShowingChangelog = !mIsShowingChangelog;

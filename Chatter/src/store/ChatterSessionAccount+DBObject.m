@@ -44,12 +44,12 @@
 		}
 		
 		// execute statement
-		if (![connection exec:statement result:&result])
+		if (!(result = [connection exec:statement]))
 			DBOBJ_ERROR(statement,retval,done);
 		
 		// handle result
 		while (![result isDone]) {
-			[result getUint32:&databaseId atColumn:0];
+			databaseId = [result getUint32AtColumn:0];
 			
 			if (FALSE == handler(databaseId))
 				break;
@@ -91,12 +91,12 @@
 		}
 		
 		// execute statement
-		if (![connection exec:statement result:&result])
+		if (!(result = [connection exec:statement]))
 			DBOBJ_ERROR(statement,retval,done);
 		
 		// handle result
 		while (![result isDone]) {
-			[result getUint32:&databaseId atColumn:0];
+			databaseId = [result getUint32AtColumn:0];
 			
 			if (FALSE == handler(databaseId))
 				break;
@@ -138,12 +138,12 @@
 		}
 		
 		// execute statement
-		if (![connection exec:statement result:&result])
+		if (!(result = [connection exec:statement]))
 			DBOBJ_ERROR(statement,retval,done);
 		
 		// handle result
 		while (![result isDone]) {
-			[result getUint32:&databaseId atColumn:0];
+			databaseId = [result getUint32AtColumn:0];
 			
 			if (FALSE == handler(databaseId))
 				break;
@@ -185,7 +185,7 @@
 		}
 		
 		// execute statement
-		if (![connection exec:statement result:&result])
+		if (!(result = [connection exec:statement]))
 			DBOBJ_ERROR(statement,retval,done);
 		
 	done:

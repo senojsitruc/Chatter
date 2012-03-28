@@ -25,8 +25,8 @@
 	BOOL mIsTerminating;
 	
 	/* interface - main */
-	NSWindow *window;
-	ProgressSheetController *mProgressSheetController;
+	NSWindow *__unsafe_unretained window;
+	ProgressSheetController *__unsafe_unretained mProgressSheetController;
 	IBOutlet PreferencesController *mPreferencesController;
 	IBOutlet ImportController *mImportController;
 	
@@ -37,7 +37,7 @@
 	/* interface - buddy/person list */
 	IBOutlet NSTableView *mBuddyTbl;
 	IBOutlet BuddyTableController *mBuddyTableController;
-	IBOutlet BuddyEditController *mBuddyEditController;
+	IBOutlet BuddyEditController *__unsafe_unretained mBuddyEditController;
 	IBOutlet NSSegmentedControl *mPersonAccountSeg;
 	
 	/* database loading */
@@ -47,7 +47,7 @@
 	BOOL mDatabaseLoadDone;
 	
 	/* toolbar */
-	NSToolbar *mToolbar;
+	NSToolbar *__weak mToolbar;
 	IBOutlet NSToolbarItem *mImportToolbarItem;
 	IBOutlet NSToolbarItem *mExportToolbarItem;
 	
@@ -62,14 +62,14 @@
 	NSMutableDictionary *mConversations;
 	
 @private
-	DBConnection *mDbConn;
+	DBConnection *__weak mDbConn;
 }
 
-@property (readwrite, assign) IBOutlet ProgressSheetController *progressSheetController;
-@property (readwrite, assign) IBOutlet BuddyEditController *buddyEditController;
-@property (assign) IBOutlet NSWindow *window;
-@property (assign) IBOutlet NSToolbar *toolbar;
-@property (readonly) DBConnection *dbConn;
+@property (readwrite, unsafe_unretained) IBOutlet ProgressSheetController *progressSheetController;
+@property (readwrite, unsafe_unretained) IBOutlet BuddyEditController *buddyEditController;
+@property (unsafe_unretained) IBOutlet NSWindow *window;
+@property (weak) IBOutlet NSToolbar *toolbar;
+@property (readonly, weak) DBConnection *dbConn;
 
 + (ChatterAppDelegate *)appDelegate;
 - (void)doActionShowConversation:(ChatterSession *)session showMessage:(ChatterMessage *)cmessage;

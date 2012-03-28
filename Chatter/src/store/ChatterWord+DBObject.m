@@ -40,7 +40,7 @@
 	
 	@synchronized (connection) {
 		// execute statement
-		if (![connection exec:statement result:&result])
+		if (!(result = [connection exec:statement]))
 			DBOBJ_ERROR(statement,retval,done);
 		
 		// handle result
@@ -75,10 +75,10 @@
 	
 	@synchronized (connection) {
 		// execute statement
-		if (![connection exec:statement result:&result])
+		if (!(result = [connection exec:statement]))
 			DBOBJ_ERROR(statement,retval,done);
 		
-		[result getUint32:&count atColumn:0];
+		count = [result getUint32AtColumn:0];
 		
 	done:
 		[statement clear];
@@ -117,7 +117,7 @@
 		}
 		
 		// execute statement
-		if (![connection exec:statement result:&result])
+		if (!(result = [connection exec:statement]))
 			DBOBJ_ERROR(statement,retval,done);
 		
 		// get primary key
@@ -162,8 +162,8 @@
  */
 - (ChatterWord *)__dbobjectHandleResult:(DBResult *)result
 {
-	[result getUint32:&mDatabaseId atColumn:0];
-	[result getString:&mWord atColumn:1];
+	mDatabaseId = [result getUint32AtColumn:0];
+	mWord = [result getStringAtColumn:1];
 	
 	return self;
 }

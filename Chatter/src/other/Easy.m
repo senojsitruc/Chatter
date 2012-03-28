@@ -130,28 +130,27 @@ static DBConnection *gDbConn;
  */
 + (void)iterateDirectory:(NSString *)directoryPath withHandle:(void (^)(NSString *filePath))handler
 {
-	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-	const char * paths[2] = { NULL, NULL };
-	FTS *tree;
-	FTSENT *node;
-	
-	paths[0] = [directoryPath cStringUsingEncoding:NSUTF8StringEncoding];
-	
-	if (NULL == (tree = fts_open((char * const *)paths, FTS_NOSTAT /*FTS_NOCHDIR*/, 0))) {
-		NSLog(@"%s.. failed to fts_open(%@)", __PRETTY_FUNCTION__, directoryPath);
-		return;
+	@autoreleasepool {
+		const char * paths[2] = { NULL, NULL };
+		FTS *tree;
+		FTSENT *node;
+		
+		paths[0] = [directoryPath cStringUsingEncoding:NSUTF8StringEncoding];
+		
+		if (NULL == (tree = fts_open((char * const *)paths, FTS_NOSTAT /*FTS_NOCHDIR*/, 0))) {
+			NSLog(@"%s.. failed to fts_open(%@)", __PRETTY_FUNCTION__, directoryPath);
+			return;
+		}
+		
+		while (NULL != (node = fts_read(tree))) {
+			if (node->fts_level > 0 && node->fts_name[0] == '.')
+				fts_set(tree, node, FTS_SKIP);
+			else if ((node->fts_info & FTS_F) || (node->fts_info & FTS_D))
+				handler([NSString stringWithCString:node->fts_path encoding:NSUTF8StringEncoding]);
+		}
+		
+		fts_close(tree);
 	}
-	
-	while (NULL != (node = fts_read(tree))) {
-		if (node->fts_level > 0 && node->fts_name[0] == '.')
-			fts_set(tree, node, FTS_SKIP);
-		else if ((node->fts_info & FTS_F) || (node->fts_info & FTS_D))
-			handler([NSString stringWithCString:node->fts_path encoding:NSUTF8StringEncoding]);
-	}
-	
-	fts_close(tree);
-	
-	[pool release];
 }
 
 /**
@@ -176,7 +175,7 @@ static DBConnection *gDbConn;
  */
 + (NSDictionary *)metadataAttributesForFilePath:(NSString *)filePath
 {
-	MDItemRef mditem = MDItemCreate(kCFAllocatorDefault, (CFStringRef)filePath);
+	MDItemRef mditem = MDItemCreate(kCFAllocatorDefault, (__bridge CFStringRef)filePath);
 	CFArrayRef attributeNames = NULL;
 	CFDictionaryRef attributeValues = NULL;
 	NSMutableDictionary *attributes = [NSMutableDictionary dictionary];
@@ -196,8 +195,8 @@ static DBConnection *gDbConn;
 		goto done;
 	}
 	
-	for (NSObject *key in (NSDictionary *)attributeValues)
-		[attributes setObject:[(NSDictionary *)attributeValues objectForKey:key] forKey:key];
+	for (NSObject *key in (__bridge NSDictionary *)attributeValues)
+		[attributes setObject:[(__bridge NSDictionary *)attributeValues objectForKey:key] forKey:key];
 	
 done:
 	if (mditem != NULL)
@@ -294,10 +293,6 @@ done:
 	
 	height = [layoutManager usedRectForTextContainer:textContainer].size.height;
 	
-	[textStorage release];
-	[textContainer release];
-	[layoutManager release];
-	
 	return height;
 }
 
@@ -339,9 +334,6 @@ done:
 				[bundlePaths addObject:[searchPath stringByAppendingPathComponent:filePath]];
 		}
 	}
-	
-	[fileManager release];
-	[searchPaths release];
 	
 	return bundlePaths;
 }

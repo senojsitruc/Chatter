@@ -19,7 +19,7 @@
  */
 + (SQLiteDBStatement *)statementWithQuery:(NSString *)query andName:(NSString *)name
 {
-	return [[[SQLiteDBStatement alloc] initWithQuery:query andName:name] autorelease];
+	return [[SQLiteDBStatement alloc] initWithQuery:query andName:name];
 }
 
 /**
@@ -28,7 +28,7 @@
  */
 + (SQLiteDBStatement *)statementWithSqlFile:(NSString *)sqlfile andName:(NSString *)name
 {
-	return [[[SQLiteDBStatement alloc] initWithSqlFile:sqlfile andName:name] autorelease];
+	return [[SQLiteDBStatement alloc] initWithSqlFile:sqlfile andName:name];
 }
 
 /**
@@ -71,8 +71,6 @@
 		sqlite3_finalize(mStmt);
 		mStmt = NULL;
 	}
-	
-	[super dealloc];
 }
 
 

@@ -45,7 +45,6 @@ done_good:
 	retval = TRUE;
 	
 done_fail:
-	[fileManager release];
 	return retval;
 }
 
@@ -86,16 +85,6 @@ done_fail:
 	}
 	
 	return self;
-}
-
-/**
- *
- *
- */
-- (void)dealloc
-{
-	[mMessageStr release];
-	[super dealloc];
 }
 
 
@@ -157,7 +146,6 @@ done_fail:
 		}
 	}
 	
-	[fileManager release];
 	
 	return good;
 }
@@ -168,22 +156,19 @@ done_fail:
  */
 - (BOOL)importData:(NSData *)data withMessageClass:(Class<ServiceImporterMessage>)messageClass andHandler:(ServiceImporterMessageCallback)handler
 {
-	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-	NSXMLParser *parser = [[NSXMLParser alloc] initWithData:data];
-	
-	mHandler = handler;
-	mMessageClass = messageClass;
-	
-	[parser setDelegate:self];
-	[parser parse];
-	[parser release];
-	
-	mHandler = nil;
-	
-	[mSender release];
-	mSender = nil;
-	
-	[pool release];
+	@autoreleasepool {
+		NSXMLParser *parser = [[NSXMLParser alloc] initWithData:data];
+		
+		mHandler = handler;
+		mMessageClass = messageClass;
+		
+		[parser setDelegate:self];
+		[parser parse];
+		
+		mHandler = nil;
+		
+		mSender = nil;
+	}
 	
 	return TRUE;
 }
@@ -229,17 +214,17 @@ done_fail:
 		}
 		else if ([elementName isEqualToString:@"event"]) {
 			mInEvent = TRUE;
-			mSender = [[attributeDict objectForKey:@"sender"] retain];
+			mSender = [attributeDict objectForKey:@"sender"];
 		}
 		else if ([elementName isEqualToString:@"message"]) {
 			mInMessage = TRUE;
-			mMessageSender = [[attributeDict objectForKey:@"sender"] retain];
-			mMessageTime = [[attributeDict objectForKey:@"time"] retain];
+			mMessageSender = [attributeDict objectForKey:@"sender"];
+			mMessageTime = [attributeDict objectForKey:@"time"];
 		}
 	}
 	else if ([elementName isEqualToString:@"chat"]) {
 		mInChat = TRUE;
-		mServiceName = [[attributeDict objectForKey:@"account"] retain];
+		mServiceName = [attributeDict objectForKey:@"account"];
 	}
 }
 
@@ -265,21 +250,13 @@ done_fail:
 			if (stop)
 				[parser abortParsing];
 			
-			[message release];
-			
-			[mMessageSender release];
 			mMessageSender = nil;
-			
-			[mMessageTime release];
 			mMessageTime = nil;
-			
 			[mMessageStr setString:@""];
-			
 			mInMessage = FALSE;
 		}
 		else if ([elementName isEqualToString:@"chat"]) {
 			mInChat = FALSE;
-			[mServiceName release];
 			mServiceName = nil;
 		}
 	}

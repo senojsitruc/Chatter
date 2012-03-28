@@ -18,7 +18,7 @@
 	/* interface */
 	NSImageView *mIconImg;
 	NSTextField *mNameTxt;
-	BuddyTableController *mController;
+	BuddyTableController *__unsafe_unretained mController;
 	
 	
 	/* data */
@@ -26,7 +26,7 @@
 	ChatterPerson *mPerson;
 }
 
-@property (readwrite, assign) BuddyTableController *controller;
+@property (readwrite, unsafe_unretained) BuddyTableController *controller;
 
 - (void)configureWithAccount:(ChatterAccount *)account;
 - (void)configureWithPerson:(ChatterPerson *)person;

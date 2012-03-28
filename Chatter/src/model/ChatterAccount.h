@@ -26,12 +26,12 @@
 	ChatterPerson *mPerson;
 }
 
-@property (readwrite, retain) NSImage *image;
+@property (readwrite, strong) NSImage *image;
 @property (readwrite, assign) NSUInteger personId;
-@property (readwrite, retain) NSString *screenname;
-@property (readwrite, retain) NSString *iconName;
+@property (readwrite, strong) NSString *screenname;
+@property (readwrite, strong) NSString *iconName;
 
-@property (readwrite, assign) ChatterPerson *person;
+@property (readwrite, weak) ChatterPerson *person;
 
 + (id)account;
 

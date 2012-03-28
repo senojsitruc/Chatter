@@ -15,7 +15,7 @@
 {
 @private
 	/* interface */
-	IBOutlet NSTableView *mTableView;
+	IBOutlet NSTableView *__weak mTableView;
 	IBOutlet NSSegmentedControl *mSortOpt;
 	IBOutlet NSSegmentedControl *mGroupOpt;
 	IBOutlet MessageTabView *mGroupByChatTab;
@@ -65,7 +65,7 @@
 	NSTimer *mQueryTimer;
 }
 
-@property (readwrite, assign) IBOutlet NSTableView *tableView;
+@property (readwrite, weak) IBOutlet NSTableView *tableView;
 
 - (void)loadData;
 - (void)resize;

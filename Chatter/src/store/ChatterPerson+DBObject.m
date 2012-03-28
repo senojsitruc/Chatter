@@ -41,7 +41,7 @@
 	
 	@synchronized (connection) {
 		// execute statement
-		if (![connection exec:statement result:&result])
+		if (!(result = [connection exec:statement]))
 			DBOBJ_ERROR(statement,retval,done);
 		
 		// handle result
@@ -84,11 +84,11 @@
 		NSUInteger databaseId = 0;
 		
 		// execute statement
-		if (![connection exec:statement result:&result])
+		if (!(result = [connection exec:statement]))
 			DBOBJ_ERROR(statement,retval,done);
 		
 		if (![result isDone]) {
-			[result getUint32:&databaseId atColumn:0];
+			databaseId = [result getUint32AtColumn:0];
 			person = [[ChatterObjectCache sharedInstance] personForId:databaseId];
 		}
 		
@@ -126,11 +126,11 @@
 	
 	@synchronized (connection) {
 		// execute statement
-		if (![connection exec:statement result:&result])
+		if (!(result = [connection exec:statement]))
 			DBOBJ_ERROR(statement,retval,done);
 		
 		if (![result isDone])
-			[result getUint32:&databaseId atColumn:0];
+			databaseId = [result getUint32AtColumn:0];
 		
 	done:
 		[statement clear];
@@ -161,10 +161,10 @@
 	
 	@synchronized (connection) {
 		// execute statement
-		if (![connection exec:statement result:&result])
+		if (!(result = [connection exec:statement]))
 			DBOBJ_ERROR(statement,retval,done);
 		
-		[result getUint32:&count atColumn:0];
+		count = [result getUint32AtColumn:0];
 		
 	done:
 		[statement clear];
@@ -216,7 +216,7 @@
 		}
 		
 		// execute statement
-		if (![connection exec:statement result:&result])
+		if (!(result = [connection exec:statement]))
 			DBOBJ_ERROR(statement,retval,done);
 		
 		// get primary key
@@ -275,7 +275,7 @@
 		}
 		
 		// execute statement
-		if (![connection exec:statement result:&result])
+		if (!(result = [connection exec:statement]))
 			DBOBJ_ERROR(statement,retval,done);
 		
 	done:
@@ -313,10 +313,9 @@
 		[statement bindUint32:mDatabaseId atIndex:1];
 		
 		// execute statement
-		if (![connection exec:statement result:&result])
+		if (!(result = [connection exec:statement]))
 			DBOBJ_ERROR(statement,retval,done);
 		
-		[[self retain] autorelease];
 		//[self.document __removeElement:self];
 		
 	done:
@@ -338,10 +337,10 @@
  */
 - (ChatterPerson *)__dbobjectHandleResult:(DBResult *)result
 {
-	[result getUint32:&mDatabaseId atColumn:0];
-	[result getString:&mFirstName atColumn:1];
-	[result getString:&mLastName atColumn:2];
-	[result getString:&mAddressBookUid atColumn:3];
+	mDatabaseId = [result getUint32AtColumn:0];
+	mFirstName = [result getStringAtColumn:1];
+	mLastName = [result getStringAtColumn:2];
+	mAddressBookUid = [result getStringAtColumn:3];
 	
 	return self;
 }

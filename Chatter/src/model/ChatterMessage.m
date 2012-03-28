@@ -41,7 +41,7 @@
  */
 + (id)message
 {
-	return [[[[self class] alloc] init] autorelease];
+	return [[[self class] alloc] init];
 }
 
 /**
@@ -50,13 +50,9 @@
  */
 - (void)dealloc
 {
-	self.screenname = nil;
 	self.timestamp = nil;
 	self.timestampStr = nil;
-	self.message = nil;
-	self.sessionName = nil;
 	
-	[super dealloc];
 }
 
 /**
@@ -179,10 +175,7 @@
 	if (mTimestamp == timestamp)
 		return;
 	
-	[mTimestamp release];
-	mTimestamp = [timestamp retain];
-	
-	[mTimestampStr release];
+	mTimestamp = timestamp;
 	mTimestampStr = nil;
 }
 
@@ -195,7 +188,7 @@
 	if (mTimestampStr != nil)
 		return mTimestampStr;
 	else if (mTimestamp != nil)
-		return (mTimestampStr = [[mTimestamp description] retain]);
+		return (mTimestampStr = [mTimestamp description]);
 	else
 		return nil;
 }
@@ -209,11 +202,8 @@
 	if (mTimestampStr == timestamp)
 		return;
 	
-	[mTimestamp release];
 	mTimestamp = nil;
-	
-	[mTimestampStr release];
-	mTimestampStr = [timestamp retain];
+	mTimestampStr = timestamp;
 }
 
 @end

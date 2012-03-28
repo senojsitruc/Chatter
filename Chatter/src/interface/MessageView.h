@@ -25,11 +25,11 @@ typedef enum
 	/* interface */
 	NSTextField *mMessageTxt;
 	NSImageView *mIconImg;
-	NSTableView *mTableView;
+	NSTableView *__weak mTableView;
 	
 	/* data */
 	ChatterAccount *mAccount;
-	ChatterMessage *mMessage;
+	ChatterMessage *__weak mMessage;
 	MessageViewPositionType mPositionType;
 	CGFloat mViewWidth;
 	CGFloat mViewHeight;
@@ -40,11 +40,11 @@ typedef enum
 	NSUInteger tableRowIndex;
 }
 
-@property (readonly) ChatterMessage *message;
+@property (readonly, weak) ChatterMessage *message;
 @property (readonly) NSTextField *messageTxt;
 @property (readwrite, assign) MessageViewPositionType positionType;
 @property (readwrite, assign) BOOL enableViewConversation;
-@property (readwrite, assign) NSTableView *tableView;
+@property (readwrite, weak) NSTableView *tableView;
 @property (readwrite, assign) NSUInteger tableRowIndex;
 
 - (void)configureWithMessage:(ChatterMessage *)message;

@@ -249,7 +249,6 @@ done_good:
 	retval = TRUE;
 	
 done_fail:
-	[fileManager release];
 	return retval;
 }
 
@@ -263,12 +262,10 @@ done_fail:
 	NSFileManager *fileManager = [[NSFileManager alloc] init];
 	
 	if (![fileManager fileExistsAtPath:filePath isDirectory:&isDir] || isDir) {
-		[fileManager release];
 		return FALSE;
 	}
 	
-	[mFilePath release];
-	mFilePath = [filePath retain];
+	mFilePath = filePath;
 	
 	// 2011-07-03.182553-0400.txt
 	if ([[mFilePath lastPathComponent] length] >= 26) {
@@ -299,11 +296,9 @@ done_fail:
 		if (fileName[17] == '-')
 			secondsFromGMT *= -1;
 		
-		[mBaseCalendar release];
 		mBaseCalendar = [[NSCalendar alloc] initWithCalendarIdentifier:NSGregorianCalendar];
 		mBaseCalendar.timeZone = [NSTimeZone timeZoneForSecondsFromGMT:secondsFromGMT];
 		
-		[mBaseTimestamp release];
 		mBaseTimestamp = [[NSDateComponents alloc] init];
 		mBaseTimestamp.year = strtol(year, NULL, 10);
 		mBaseTimestamp.month = strtol(month, NULL, 10);
@@ -312,8 +307,6 @@ done_fail:
 		mBaseTimestamp.minute = 0;
 		mBaseTimestamp.second = 0;
 	}
-	
-	[fileManager release];
 	
 	return [self importData:[NSData dataWithContentsOfFile:filePath] withMessageClass:messageClass andHandler:handler];
 }
@@ -324,118 +317,112 @@ done_fail:
  */
 - (BOOL)importData:(NSData *)data withMessageClass:(Class<ServiceImporterMessage>)messageClass andHandler:(ServiceImporterMessageCallback)handler
 {
-	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-	NSArray *lines = [[NSString stringWithUTF8String:[data bytes]] componentsSeparatedByCharactersInSet:[NSCharacterSet newlineCharacterSet]];
-	
-	if ([lines count] == 0)
-		goto done;
-	
-	// Conversation with smarterchild at Sun Jul  3 18:25:53 2011 on stygian20 (aim)
-	// <html><head><meta http-equiv="content-type" content="text/html; charset=UTF-8"><title>Conversation with smarterchild at Sat 09 Jul 2011 09:11:55 AM EDT on stygian20 (aim) ...
-	if (mBaseTimestamp == nil) {
-		NSString *header = [lines objectAtIndex:0];
-		NSRange atRange = [header rangeOfString:@" at "];
-		NSString *ibDateStr = [header substringWithRange:NSMakeRange(atRange.location+4, 24)];
-		NSString *dateStr = [InstantBirdImporter instantBirdDateToStandard:ibDateStr];
+	@autoreleasepool {
+		NSArray *lines = [[NSString stringWithUTF8String:[data bytes]] componentsSeparatedByCharactersInSet:[NSCharacterSet newlineCharacterSet]];
 		
-		mBaseCalendar = [[NSCalendar currentCalendar] retain];
-		mBaseTimestamp = [[mBaseCalendar components:(NSYearCalendarUnit | NSMonthCalendarUnit | NSDayCalendarUnit | NSHourCalendarUnit | NSMinuteCalendarUnit | NSSecondCalendarUnit) fromDate:[NSDate dateWithString:dateStr]] retain];
-	}
-	
-	// (18:25:53) stygian20: Yo. This is a test message.
-	// (10:13:18 AM) stygian20: Hello there.
-	// <font color="#A82F2F"><font size="2">(09:11:55 AM)</font> <b>Curtis Jones:</b></font> Hello.<br/>
-	for (NSString *line in lines) {
-		NSString *screenName, *messageStr;
-		NSRange openParenRange, closeParenRange, colonRange;
+		if ([lines count] == 0)
+			goto done;
 		
-		if (FALSE == [line hasPrefix:@"("] && FALSE == [line hasPrefix:@"<font"])
-			continue;
-		
-		// parse the timestamp
-		{
-			openParenRange = [line rangeOfString:@"("];
-			closeParenRange = [line rangeOfString:@")"];
+		// Conversation with smarterchild at Sun Jul  3 18:25:53 2011 on stygian20 (aim)
+		// <html><head><meta http-equiv="content-type" content="text/html; charset=UTF-8"><title>Conversation with smarterchild at Sat 09 Jul 2011 09:11:55 AM EDT on stygian20 (aim) ...
+		if (mBaseTimestamp == nil) {
+			NSString *header = [lines objectAtIndex:0];
+			NSRange atRange = [header rangeOfString:@" at "];
+			NSString *ibDateStr = [header substringWithRange:NSMakeRange(atRange.location+4, 24)];
+			NSString *dateStr = [InstantBirdImporter instantBirdDateToStandard:ibDateStr];
 			
-			if (openParenRange.location == NSNotFound || closeParenRange.location == NSNotFound)
+			mBaseCalendar = [NSCalendar currentCalendar];
+			mBaseTimestamp = [mBaseCalendar components:(NSYearCalendarUnit | NSMonthCalendarUnit | NSDayCalendarUnit | NSHourCalendarUnit | NSMinuteCalendarUnit | NSSecondCalendarUnit) fromDate:[NSDate dateWithString:dateStr]];
+		}
+		
+		// (18:25:53) stygian20: Yo. This is a test message.
+		// (10:13:18 AM) stygian20: Hello there.
+		// <font color="#A82F2F"><font size="2">(09:11:55 AM)</font> <b>Curtis Jones:</b></font> Hello.<br/>
+		for (NSString *line in lines) {
+			NSString *screenName, *messageStr;
+			NSRange openParenRange, closeParenRange, colonRange;
+			
+			if (FALSE == [line hasPrefix:@"("] && FALSE == [line hasPrefix:@"<font"])
 				continue;
 			
-			NSString *dateStr = [line substringWithRange:NSMakeRange(openParenRange.location+1, closeParenRange.location-openParenRange.location-1)];
-			
-			// 18:25:53
-			if ([dateStr length] == 8) {
-				NSInteger hour = [[dateStr substringWithRange:NSMakeRange(0,2)] integerValue];
-				NSInteger minute = [[dateStr substringWithRange:NSMakeRange(3,2)] integerValue];
-				NSInteger second = [[dateStr substringWithRange:NSMakeRange(6,2)] integerValue];
+			// parse the timestamp
+			{
+				openParenRange = [line rangeOfString:@"("];
+				closeParenRange = [line rangeOfString:@")"];
 				
-				if (hour < mBaseTimestamp.hour)
-					mBaseTimestamp.day += 1;
+				if (openParenRange.location == NSNotFound || closeParenRange.location == NSNotFound)
+					continue;
 				
-				mBaseTimestamp.hour = hour;
-				mBaseTimestamp.minute = minute;
-				mBaseTimestamp.second = second;
+				NSString *dateStr = [line substringWithRange:NSMakeRange(openParenRange.location+1, closeParenRange.location-openParenRange.location-1)];
+				
+				// 18:25:53
+				if ([dateStr length] == 8) {
+					NSInteger hour = [[dateStr substringWithRange:NSMakeRange(0,2)] integerValue];
+					NSInteger minute = [[dateStr substringWithRange:NSMakeRange(3,2)] integerValue];
+					NSInteger second = [[dateStr substringWithRange:NSMakeRange(6,2)] integerValue];
+					
+					if (hour < mBaseTimestamp.hour)
+						mBaseTimestamp.day += 1;
+					
+					mBaseTimestamp.hour = hour;
+					mBaseTimestamp.minute = minute;
+					mBaseTimestamp.second = second;
+				}
+				
+				// 10:13:18 AM
+				else if ([dateStr length] == 11) {
+					NSInteger hour = [[dateStr substringWithRange:NSMakeRange(0,2)] integerValue];
+					NSInteger minute = [[dateStr substringWithRange:NSMakeRange(3,2)] integerValue];
+					NSInteger second = [[dateStr substringWithRange:NSMakeRange(6,2)] integerValue];
+					
+					if ([dateStr hasSuffix:@"PM"])
+						hour += 12;
+					
+					if (hour < mBaseTimestamp.hour)
+						mBaseTimestamp.day += 1;
+					
+					mBaseTimestamp.hour = hour;
+					mBaseTimestamp.minute = minute;
+					mBaseTimestamp.second = second;
+				}
 			}
 			
-			// 10:13:18 AM
-			else if ([dateStr length] == 11) {
-				NSInteger hour = [[dateStr substringWithRange:NSMakeRange(0,2)] integerValue];
-				NSInteger minute = [[dateStr substringWithRange:NSMakeRange(3,2)] integerValue];
-				NSInteger second = [[dateStr substringWithRange:NSMakeRange(6,2)] integerValue];
-				
-				if ([dateStr hasSuffix:@"PM"])
-					hour += 12;
-				
-				if (hour < mBaseTimestamp.hour)
-					mBaseTimestamp.day += 1;
-				
-				mBaseTimestamp.hour = hour;
-				mBaseTimestamp.minute = minute;
-				mBaseTimestamp.second = second;
+			// parse the screen name and message
+			{
+				// plain text
+				if ([line hasPrefix:@"("]) {
+					colonRange = [line rangeOfString:@":" options:0 range:NSMakeRange(closeParenRange.location+1, [line length]-closeParenRange.location-1)];
+					screenName = [line substringWithRange:NSMakeRange(closeParenRange.location+2, colonRange.location-closeParenRange.location-2)];
+					messageStr = [line substringFromIndex:colonRange.location+2];
+				}
+				// html
+				else if ([line hasPrefix:@"<"]) {
+					colonRange = [line rangeOfString:@":" options:0 range:NSMakeRange(closeParenRange.location+12, [line length]-closeParenRange.location-12)];
+					screenName = [line substringWithRange:NSMakeRange(closeParenRange.location+12, colonRange.location-closeParenRange.location-12)];
+					messageStr = [line substringWithRange:NSMakeRange(colonRange.location+13, [line length]-colonRange.location-13-5)];
+				}
 			}
-		}
-		
-		// parse the screen name and message
-		{
-			// plain text
-			if ([line hasPrefix:@"("]) {
-				colonRange = [line rangeOfString:@":" options:0 range:NSMakeRange(closeParenRange.location+1, [line length]-closeParenRange.location-1)];
-				screenName = [line substringWithRange:NSMakeRange(closeParenRange.location+2, colonRange.location-closeParenRange.location-2)];
-				messageStr = [line substringFromIndex:colonRange.location+2];
+			
+			// create and send the message
+			{
+				id<ServiceImporterMessage> message = [[(Class)messageClass alloc] init];
+				BOOL stop = FALSE;
+				
+				[message setScreenname:screenName];
+				[message setTimestamp:[mBaseCalendar dateFromComponents:mBaseTimestamp]];
+				[message setMessage:messageStr];
+				
+				handler(message, &stop);
+				
+				if (stop)
+					break;
 			}
-			// html
-			else if ([line hasPrefix:@"<"]) {
-				colonRange = [line rangeOfString:@":" options:0 range:NSMakeRange(closeParenRange.location+12, [line length]-closeParenRange.location-12)];
-				screenName = [line substringWithRange:NSMakeRange(closeParenRange.location+12, colonRange.location-closeParenRange.location-12)];
-				messageStr = [line substringWithRange:NSMakeRange(colonRange.location+13, [line length]-colonRange.location-13-5)];
-			}
-		}
-		
-		// create and send the message
-		{
-			id<ServiceImporterMessage> message = [[(Class)messageClass alloc] init];
-			BOOL stop = FALSE;
-			
-			[message setScreenname:screenName];
-			[message setTimestamp:[mBaseCalendar dateFromComponents:mBaseTimestamp]];
-			[message setMessage:messageStr];
-			
-			handler(message, &stop);
-			
-			if (stop)
-				break;
-			
-			[message release];
 		}
 	}
 	
 done:
-	[mBaseTimestamp release];
 	mBaseTimestamp = nil;
-	
-	[mBaseCalendar release];
 	mBaseCalendar = nil;
-	
-	[pool release];
 	return TRUE;
 }
 

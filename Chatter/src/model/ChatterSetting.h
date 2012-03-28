@@ -15,8 +15,8 @@
 	NSString *mValue;
 }
 
-@property (readwrite, retain) NSString *name;
-@property (readwrite, retain) NSString *valueString;
+@property (readwrite, strong) NSString *name;
+@property (readwrite, strong) NSString *valueString;
 @property (readwrite, assign) NSInteger valueInteger;
 
 + (id)setting;

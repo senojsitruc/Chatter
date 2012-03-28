@@ -20,14 +20,14 @@
 	NSString *mTimestampStr;
 	
 	/* weak references */
-	ChatterSource *mSource;
+	ChatterSource *__weak mSource;
 }
 
 @property (readwrite, assign) NSUInteger sourceId;
-@property (readwrite, retain) NSString *name;
-@property (readwrite, retain) NSDate *timestamp;
-@property (readwrite, retain) NSString *timestampStr;
-@property (readwrite, assign) ChatterSource *source;
+@property (readwrite, strong) NSString *name;
+@property (readwrite, strong) NSDate *timestamp;
+@property (readwrite, strong) NSString *timestampStr;
+@property (readwrite, weak) ChatterSource *source;
 
 + (id)session;
 

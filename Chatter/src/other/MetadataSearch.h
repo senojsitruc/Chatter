@@ -27,11 +27,11 @@ typedef void (^MetadataSearchHandler)(NSArray*, BOOL*);
 }
 
 @property (readonly) BOOL isDone;
-@property (readwrite, retain) NSString *contentType;
-@property (readwrite, retain) NSString *typeCode;
-@property (readwrite, retain) NSString *kind;
-@property (readwrite, retain) NSString *name;
-@property (readwrite, assign) MetadataSearchHandler handler;
+@property (readwrite, strong) NSString *contentType;
+@property (readwrite, strong) NSString *typeCode;
+@property (readwrite, strong) NSString *kind;
+@property (readwrite, strong) NSString *name;
+@property (readwrite, weak) MetadataSearchHandler handler;
 
 + (id)searchByContentType:(NSString *)contentType andTypeCode:(NSString *)typeCode andKind:(NSString *)kind andName:(NSString *)name withHandler:(MetadataSearchHandler)handler;
 

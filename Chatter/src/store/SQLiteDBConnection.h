@@ -45,7 +45,7 @@
 /**
  *
  */
-- (BOOL)exec:(DBStatement *)statement result:(DBResult **)result;
+- (DBResult *)exec:(DBStatement *)statement;
 
 /**
  *

@@ -31,7 +31,7 @@
 	NSMutableDictionary *mBubbleColorsByPersonId;
 }
 
-@property (readwrite, retain) ChatterSession *session;
+@property (readwrite, strong) ChatterSession *session;
 
 - (id)initWithMessages:(NSArray *)messages;
 

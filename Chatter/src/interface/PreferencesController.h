@@ -11,9 +11,9 @@
 @interface PreferencesController : NSViewController <NSToolbarDelegate>
 {
 @private
-	NSWindow *mWindow;
-	NSTabView *mTabView;
-	NSToolbar *mToolbar;
+	NSWindow *__unsafe_unretained mWindow;
+	NSTabView *__weak mTabView;
+	NSToolbar *__weak mToolbar;
 	
 	IBOutlet NSView *mGeneralView;
 	IBOutlet NSView *mAppearanceView;
@@ -21,9 +21,9 @@
 	IBOutlet NSView *mExportersView;
 }
 
-@property (readwrite, assign) IBOutlet NSWindow *window;
-@property (readwrite, assign) IBOutlet NSTabView *tabView;
-@property (readwrite, assign) IBOutlet NSToolbar *toolbar;
+@property (readwrite, unsafe_unretained) IBOutlet NSWindow *window;
+@property (readwrite, weak) IBOutlet NSTabView *tabView;
+@property (readwrite, weak) IBOutlet NSToolbar *toolbar;
 
 - (void)showInWindow:(NSWindow *)window;
 - (void)hide;

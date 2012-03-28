@@ -15,15 +15,6 @@
 @synthesize text;
 @synthesize flags;
 
-- (void)dealloc
-{
-	[sender release];
-	[date release];
-	[text release];
-	
-	[super dealloc];
-}
-
 - (void)encodeWithCoder:(NSCoder *)encoder
 {
 	NSLog(@"encodeWithCoder called on %@", [self class]);
@@ -33,16 +24,16 @@
 {
 	if ([decoder allowsKeyedCoding])
 	{
-		sender = [[decoder decodeObjectForKey:@"Sender"] retain];
-		text = [[decoder decodeObjectForKey:@"MessageText"] retain];
-		date = [[decoder decodeObjectForKey:@"Time"] retain];
+		sender = [decoder decodeObjectForKey:@"Sender"];
+		text = [decoder decodeObjectForKey:@"MessageText"];
+		date = [decoder decodeObjectForKey:@"Time"];
 		flags = [decoder decodeInt32ForKey:@"Flags"];
 	}
 	else
 	{
-		sender = [[decoder decodeObject] retain];
-		date = [[decoder decodeObject] retain];
-		text = [[decoder decodeObject] retain];
+		sender = [decoder decodeObject];
+		date = [decoder decodeObject];
+		text = [decoder decodeObject];
 		[decoder decodeValueOfObjCType:@encode(unsigned int) at:&flags];
 	}
 	

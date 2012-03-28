@@ -17,7 +17,7 @@
 	
 }
 
-@property (readwrite, retain) NSString *word;
+@property (readwrite, strong) NSString *word;
 
 + (id)word;
 

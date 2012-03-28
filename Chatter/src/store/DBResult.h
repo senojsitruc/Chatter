@@ -13,11 +13,11 @@
 @interface DBResult : NSObject
 {
 	BOOL mIsDone;
-	CZDocument *mDocument;                // weak reference to an optional document object
+	CZDocument *__unsafe_unretained mDocument;                // weak reference to an optional document object
 }
 
 @property (readonly) BOOL isDone;
-@property (readwrite, assign) CZDocument *document;
+@property (readwrite, unsafe_unretained) CZDocument *document;
 
 /**
  *
@@ -27,41 +27,41 @@
 /**
  *
  */
-- (BOOL)getString:(NSString **)value atColumn:(NSUInteger)column;
+- (NSString *)getStringAtColumn:(NSUInteger)column;
 
 /**
  *
  */
-- (BOOL)getBlob:(NSData **)value atColumn:(NSUInteger)column;
+- (NSData *)getBlobAtColumn:(NSUInteger)column;
 
 /**
  *
  */
-- (BOOL)getDate:(NSDate **)value atColumn:(NSUInteger)column;
+- (NSDate *)getDateAtColumn:(NSUInteger)column;
 
 /**
  *
  */
-- (BOOL)getInt32:(NSInteger *)value atColumn:(NSUInteger)column;
+- (NSInteger)getInt32AtColumn:(NSUInteger)column;
 
 /**
  *
  */
-- (BOOL)getUint32:(NSUInteger *)value atColumn:(NSUInteger)column;
+- (NSUInteger)getUint32AtColumn:(NSUInteger)column;
 
 /**
  *
  */
-- (BOOL)getUint64:(uint64_t *)value atColumn:(NSUInteger)column;
+- (uint64_t)getUint64AtColumn:(NSUInteger)column;
 
 /**
  *
  */
-- (BOOL)getFloat:(float *)value atColumn:(NSUInteger)column;
+- (float)getFloatAtColumn:(NSUInteger)column;
 
 /**
  *
  */
-- (BOOL)getDouble:(double *)value atColumn:(NSUInteger)column;
+- (double)getDoubleAtColumn:(NSUInteger)column;
 
 @end

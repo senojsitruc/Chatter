@@ -36,7 +36,7 @@ static NSMutableDictionary *gImporters;
 		if (nil != (pluginBundle = [NSBundle bundleWithPath:pluginPath])) {
 			if (nil != (pluginClass = [pluginBundle principalClass])) {
 				if ([(Class)pluginClass conformsToProtocol:@protocol(ServiceImporter)]) {
-					[gImporters setObject:[[[(Class)pluginClass alloc] init] autorelease] forKey:[pluginClass name]];
+					[gImporters setObject:[[(Class)pluginClass alloc] init] forKey:[pluginClass name]];
 					NSLog(@"Registered importer %@", NSStringFromClass(pluginClass));
 				}
 			}

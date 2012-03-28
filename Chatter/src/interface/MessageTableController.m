@@ -125,19 +125,11 @@
  */
 - (void)dealloc
 {
-	[mData release];
-	[mVisibleData release];
-	[mTmpVisibleData release];
-	
 	CGColorSpaceRelease(mBubbleSpace);
 	CGColorRelease(mBubbleColors[0]);
 	CGColorRelease(mBubbleColors[1]);
-	[mBubbleColorsByAccountId release];
-	[mBubbleColorsByPersonId release];
 	
 	[[NSNotificationCenter defaultCenter] removeObserver:self];
-	
-	[super dealloc];
 }
 
 
@@ -152,15 +144,14 @@
  */
 - (void)loadData
 {
-	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-	NSArray *messages = [[ChatterObjectCache sharedInstance] allMessages];	
-	
-	[mData removeAllObjects];
-	[mData setArray:messages];
-	
-	dispatch_semaphore_signal(mRenderSem);
-	
-	[pool release];
+	@autoreleasepool {
+		NSArray *messages = [[ChatterObjectCache sharedInstance] allMessages];	
+		
+		[mData removeAllObjects];
+		[mData setArray:messages];
+		
+		dispatch_semaphore_signal(mRenderSem);
+	}
 }
 
 /**
@@ -184,253 +175,248 @@
  */
 - (void)renderThread
 {
-	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-	
-	while (!mStopRendering) {
-		dispatch_semaphore_wait(mRenderSem, DISPATCH_TIME_FOREVER);
-		
-		NSArray *visibleData = nil;
-		NSAutoreleasePool *pool2 = [[NSAutoreleasePool alloc] init];
-		
-		[Easy postNotification:@"ChatterNotificationProgressTextChanged" object:@"Rendering..."];
-		
-		// obtain the messages set which will become our new visible message set. this means finding
-		// the overlap of the search data set and the filtered data set (as applicable).
-		{
-			if (mIsSearched && mIsFiltered) {
-				NSArray *messages;
-				NSIndexSet *messageIds;
-				NSMutableArray *newData = [NSMutableArray array];
-				
-				if ([mSearchData count] <= [mFilterData count]) {
-					messages = [mSearchData retain];
-					messageIds = [mFilterIds retain];
-				}
-				else {
-					messages = [mFilterData retain];
-					messageIds = [mSearchIds retain];
-				}
-				
-				[messages release];
-				[messageIds release];
-				
-				for (ChatterMessage *cmessage in messages) {
-					if (mStopRendering)
-						goto done;
-					if ([messageIds containsIndex:cmessage.databaseId])
-						[newData addObject:cmessage];
-				}
-				
-				visibleData = newData;
-			}
-			else if (mIsSearched)
-				visibleData = mSearchData;
-			else if (mIsFiltered)
-				visibleData = mFilterData;
-			else
-				visibleData = mData;
-		}
-		
-		// group by person. first sort the messages by the name of the sender and then insert markers
-		// (NSNull's) indicating the start of each message group.
-		if (mIsGroupedByPerson)
-		{
-			NSArray *messages;
+	@autoreleasepool {
+		while (!mStopRendering) {
+			dispatch_semaphore_wait(mRenderSem, DISPATCH_TIME_FOREVER);
 			
-			messages = [[visibleData sortedArrayUsingComparator:(^ NSComparisonResult (id obj1, id obj2) {
-				ChatterAccount *account1, *account2;
-				NSString *name1, *name2;
+			NSArray *visibleData = nil;
+			@autoreleasepool {
+				[Easy postNotification:@"ChatterNotificationProgressTextChanged" object:@"Rendering..."];
 				
-				account1 = ((ChatterMessage *)obj1).account;
-				account2 = ((ChatterMessage *)obj2).account;
-				
-				name1 = account1.person.name;
-				name2 = account2.person.name;
-				
-				if (name1 == nil)
-					name1 = account1.screenname;
-				
-				if (name2 == nil)
-					name2 = account2.screenname;
-				
-				return mIsSortedAscending ? [name1 compare:name2] : [name2 compare:name1];
-			})] retain];
-			
-			if ([messages count] != 0) {
-				NSMutableArray *tmpVisibleData = [NSMutableArray array];
-				NSUInteger participantId = 0;
-				
-				for (ChatterMessage *cmessage in messages) {
-					ChatterAccount *caccount = cmessage.account;
-					ChatterPerson *cperson = caccount.person;
-					NSUInteger theId;
-					
-					if (mStopRendering)
-						goto done;
-					
-					if (cperson != nil)
-						theId = cperson.databaseId;
-					else
-						theId = caccount.databaseId;
-					
-					if (theId != participantId) {
-						[tmpVisibleData addObject:[NSNull null]];
-						participantId = theId;
-					}
-					
-					[tmpVisibleData addObject:cmessage];
-				}
-				
-				visibleData = tmpVisibleData;
-			}
-		}
-		
-		// group by chat and sort by date. fist sort the messages by date, then if we want the messages
-		// sorted ascending just insert the NSNull message group markers and we're done. if we want the
-		// messages sorted descending split the messages into arrays of individual conversations. sort
-		// the conversations (descending). merge the conversations together with the group markers.
-		else if (mIsGroupedByChat)
-		{
-			NSArray *messages;
-			
-			messages = [[visibleData sortedArrayUsingComparator:(^ NSComparisonResult (id obj1, id obj2) {
-				ChatterSource *source1, *source2;
-				
-				source1 = ((ChatterMessage *)obj1).source;
-				source2 = ((ChatterMessage *)obj2).source;
-				
-				return [source1.timestampStr compare:source2.timestampStr];
-			})] retain];
-			
-			if ([messages count] != 0) {
-				NSMutableArray *tmpVisibleData = [NSMutableArray array];
-				NSUInteger sourceId = 0;
-				
-				// sort ascending
-				if (mIsSortedAscending) {
-					for (ChatterMessage *cmessage in messages) {
-						NSUInteger theId = cmessage.sourceId;
+				// obtain the messages set which will become our new visible message set. this means finding
+				// the overlap of the search data set and the filtered data set (as applicable).
+				{
+					if (mIsSearched && mIsFiltered) {
+						NSArray *messages;
+						NSIndexSet *messageIds;
+						NSMutableArray *newData = [NSMutableArray array];
 						
-						if (mStopRendering)
-							goto done;
-						
-						if (theId != sourceId) {
-							[tmpVisibleData addObject:[NSNull null]];
-							sourceId = theId;
+						if ([mSearchData count] <= [mFilterData count]) {
+							messages = mSearchData;
+							messageIds = mFilterIds;
+						}
+						else {
+							messages = mFilterData;
+							messageIds = mSearchIds;
 						}
 						
-						[tmpVisibleData addObject:cmessage];
+						
+						for (ChatterMessage *cmessage in messages) {
+							if (mStopRendering)
+								goto done;
+							if ([messageIds containsIndex:cmessage.databaseId])
+								[newData addObject:cmessage];
+						}
+						
+						visibleData = newData;
+					}
+					else if (mIsSearched)
+						visibleData = mSearchData;
+					else if (mIsFiltered)
+						visibleData = mFilterData;
+					else
+						visibleData = mData;
+				}
+				
+				// group by person. first sort the messages by the name of the sender and then insert markers
+				// (NSNull's) indicating the start of each message group.
+				if (mIsGroupedByPerson)
+				{
+					NSArray *messages;
+					
+					messages = [visibleData sortedArrayUsingComparator:(^ NSComparisonResult (id obj1, id obj2) {
+						ChatterAccount *account1, *account2;
+						NSString *name1, *name2;
+						
+						account1 = ((ChatterMessage *)obj1).account;
+						account2 = ((ChatterMessage *)obj2).account;
+						
+						name1 = account1.person.name;
+						name2 = account2.person.name;
+						
+						if (name1 == nil)
+							name1 = account1.screenname;
+						
+						if (name2 == nil)
+							name2 = account2.screenname;
+						
+						return mIsSortedAscending ? [name1 compare:name2] : [name2 compare:name1];
+					})];
+					
+					if ([messages count] != 0) {
+						NSMutableArray *tmpVisibleData = [NSMutableArray array];
+						NSUInteger participantId = 0;
+						
+						for (ChatterMessage *cmessage in messages) {
+							ChatterAccount *caccount = cmessage.account;
+							ChatterPerson *cperson = caccount.person;
+							NSUInteger theId;
+							
+							if (mStopRendering)
+								goto done;
+							
+							if (cperson != nil)
+								theId = cperson.databaseId;
+							else
+								theId = caccount.databaseId;
+							
+							if (theId != participantId) {
+								[tmpVisibleData addObject:[NSNull null]];
+								participantId = theId;
+							}
+							
+							[tmpVisibleData addObject:cmessage];
+						}
+						
+						visibleData = tmpVisibleData;
 					}
 				}
 				
-				// sort descending
-				else if (mIsSortedDescending) {
-					NSMutableArray *conversations = [NSMutableArray array];
-					NSMutableArray *conversation = nil;
+				// group by chat and sort by date. fist sort the messages by date, then if we want the messages
+				// sorted ascending just insert the NSNull message group markers and we're done. if we want the
+				// messages sorted descending split the messages into arrays of individual conversations. sort
+				// the conversations (descending). merge the conversations together with the group markers.
+				else if (mIsGroupedByChat)
+				{
+					NSArray *messages;
 					
-					// split up the messages by conversation
-					for (ChatterMessage *cmessage in messages) {
-						NSUInteger theId = cmessage.sourceId;
+					messages = [visibleData sortedArrayUsingComparator:(^ NSComparisonResult (id obj1, id obj2) {
+						ChatterSource *source1, *source2;
 						
-						if (mStopRendering)
-							goto done;
+						source1 = ((ChatterMessage *)obj1).source;
+						source2 = ((ChatterMessage *)obj2).source;
 						
-						if (theId != sourceId) {
+						return [source1.timestampStr compare:source2.timestampStr];
+					})];
+					
+					if ([messages count] != 0) {
+						NSMutableArray *tmpVisibleData = [NSMutableArray array];
+						NSUInteger sourceId = 0;
+						
+						// sort ascending
+						if (mIsSortedAscending) {
+							for (ChatterMessage *cmessage in messages) {
+								NSUInteger theId = cmessage.sourceId;
+								
+								if (mStopRendering)
+									goto done;
+								
+								if (theId != sourceId) {
+									[tmpVisibleData addObject:[NSNull null]];
+									sourceId = theId;
+								}
+								
+								[tmpVisibleData addObject:cmessage];
+							}
+						}
+						
+						// sort descending
+						else if (mIsSortedDescending) {
+							NSMutableArray *conversations = [NSMutableArray array];
+							NSMutableArray *conversation = nil;
+							
+							// split up the messages by conversation
+							for (ChatterMessage *cmessage in messages) {
+								NSUInteger theId = cmessage.sourceId;
+								
+								if (mStopRendering)
+									goto done;
+								
+								if (theId != sourceId) {
+									if (conversation != nil)
+										[conversations addObject:conversation];
+									conversation = [NSMutableArray array];
+									sourceId = theId;
+								}
+								
+								[conversation addObject:cmessage];
+							}
+							
 							if (conversation != nil)
 								[conversations addObject:conversation];
-							conversation = [NSMutableArray array];
-							sourceId = theId;
+							
+							// sort the messages within each conversation - ascending
+							for (NSMutableArray *conversation in conversations) {
+								if (mStopRendering)
+									goto done;
+								[conversation setArray:[conversation sortedArrayUsingComparator:(^ NSComparisonResult (id obj1, id obj2) {
+									return [((ChatterMessage *)obj1).timestampStr compare:((ChatterMessage *)obj2).timestampStr];
+								})]];
+							}
+							
+							// sort the conversations - descending
+							[conversations setArray:[conversations sortedArrayUsingComparator:(^ NSComparisonResult (id obj1, id obj2) {
+								return [((ChatterMessage *)[(NSArray *)obj2 objectAtIndex:0]).timestampStr compare:((ChatterMessage *)[(NSArray *)obj1 objectAtIndex:0]).timestampStr];
+							})]];
+							
+							// merge the conversations together
+							for (NSArray *conversation in conversations) {
+								if (mStopRendering)
+									goto done;
+								[tmpVisibleData addObject:[NSNull null]];
+								[tmpVisibleData addObjectsFromArray:conversation];
+							}
 						}
 						
-						[conversation addObject:cmessage];
-					}
-					
-					if (conversation != nil)
-						[conversations addObject:conversation];
-					
-					// sort the messages within each conversation - ascending
-					for (NSMutableArray *conversation in conversations) {
-						if (mStopRendering)
-							goto done;
-						[conversation setArray:[conversation sortedArrayUsingComparator:(^ NSComparisonResult (id obj1, id obj2) {
-							return [((ChatterMessage *)obj1).timestampStr compare:((ChatterMessage *)obj2).timestampStr];
-						})]];
-					}
-					
-					// sort the conversations - descending
-					[conversations setArray:[conversations sortedArrayUsingComparator:(^ NSComparisonResult (id obj1, id obj2) {
-						return [((ChatterMessage *)[(NSArray *)obj2 objectAtIndex:0]).timestampStr compare:((ChatterMessage *)[(NSArray *)obj1 objectAtIndex:0]).timestampStr];
-					})]];
-					
-					// merge the conversations together
-					for (NSArray *conversation in conversations) {
-						if (mStopRendering)
-							goto done;
-						[tmpVisibleData addObject:[NSNull null]];
-						[tmpVisibleData addObjectsFromArray:conversation];
+						visibleData = tmpVisibleData;
 					}
 				}
 				
-				visibleData = tmpVisibleData;
-			}
-		}
-		
-		// sort the messages by date
-		else if (mIsSortedByDate)
-		{
-			// sort by date ascending (chronological)
-			if (mIsSortedAscending) {
-				visibleData = [[visibleData sortedArrayUsingComparator:(^ NSComparisonResult (id obj1, id obj2) {
-					return [((ChatterMessage *)obj1).timestampStr compare:((ChatterMessage *)obj2).timestampStr];
-				})] retain];
-			}
+				// sort the messages by date
+				else if (mIsSortedByDate)
+				{
+					// sort by date ascending (chronological)
+					if (mIsSortedAscending) {
+						visibleData = [visibleData sortedArrayUsingComparator:(^ NSComparisonResult (id obj1, id obj2) {
+							return [((ChatterMessage *)obj1).timestampStr compare:((ChatterMessage *)obj2).timestampStr];
+						})];
+					}
+					
+					// sort by date descending (reverse chronological)
+					else if (mIsSortedDescending) {
+						visibleData = [visibleData sortedArrayUsingComparator:(^ NSComparisonResult (id obj1, id obj2) {
+							return [((ChatterMessage *)obj2).timestampStr compare:((ChatterMessage *)obj1).timestampStr];
+						})];
+					}
+				}
+				
+				// sort the messages by person (sender)
+				else if (mIsSortedByPerson) {
+					visibleData = [visibleData sortedArrayUsingComparator:(^ NSComparisonResult (id obj1, id obj2) {
+						ChatterAccount *account1, *account2;
+						NSString *name1, *name2;
+						
+						account1 = ((ChatterMessage *)obj1).account;
+						account2 = ((ChatterMessage *)obj2).account;
+						
+						name1 = account1.person.name;
+						name2 = account2.person.name;
+						
+						if (name1 == nil)
+							name1 = account1.screenname;
+						
+						if (name2 == nil)
+							name2 = account2.screenname;
+						
+						return mIsSortedAscending ? [name1 compare:name2] : [name2 compare:name1];
+					})];
+				}
+				
+				if (mStopRendering)
+					goto done;
+				
+				mTmpVisibleData = visibleData;
+				
+				[Easy postNotification:@"ChatterNotificationProgressTextChanged" object:@""];
+				
+				[self performSelectorOnMainThread:@selector(showDataSetChanges) withObject:nil waitUntilDone:FALSE];
 			
-			// sort by date descending (reverse chronological)
-			else if (mIsSortedDescending) {
-				visibleData = [[visibleData sortedArrayUsingComparator:(^ NSComparisonResult (id obj1, id obj2) {
-					return [((ChatterMessage *)obj2).timestampStr compare:((ChatterMessage *)obj1).timestampStr];
-				})] retain];
 			}
 		}
 		
-		// sort the messages by person (sender)
-		else if (mIsSortedByPerson) {
-			visibleData = [[visibleData sortedArrayUsingComparator:(^ NSComparisonResult (id obj1, id obj2) {
-				ChatterAccount *account1, *account2;
-				NSString *name1, *name2;
-				
-				account1 = ((ChatterMessage *)obj1).account;
-				account2 = ((ChatterMessage *)obj2).account;
-				
-				name1 = account1.person.name;
-				name2 = account2.person.name;
-				
-				if (name1 == nil)
-					name1 = account1.screenname;
-				
-				if (name2 == nil)
-					name2 = account2.screenname;
-				
-				return mIsSortedAscending ? [name1 compare:name2] : [name2 compare:name1];
-			})] retain];
-		}
-		
-		if (mStopRendering)
-			goto done;
-		
-		[mTmpVisibleData release];
-		mTmpVisibleData = [visibleData retain];
-		
-		[Easy postNotification:@"ChatterNotificationProgressTextChanged" object:@""];
-		
-		[self performSelectorOnMainThread:@selector(showDataSetChanges) withObject:nil waitUntilDone:FALSE];
-		
-		[pool2 release];
-	}
-	
 done:
-	[Easy postNotification:@"ChatterNotificationProgressTextChanged" object:@""];
-	[pool release];
+		[Easy postNotification:@"ChatterNotificationProgressTextChanged" object:@""];
+	}
 }
 
 /**
@@ -445,15 +431,13 @@ done:
 	
 	[mTableView removeRowsAtIndexes:[NSIndexSet indexSetWithIndexesInRange:NSMakeRange(0,mVisibleCount2)] withAnimation:NSTableViewAnimationSlideRight];
 	
-	NSArray *visibleData = [mTmpVisibleData retain];
+	NSArray *visibleData = mTmpVisibleData;
 	mTmpVisibleData = nil;
 	
-	[mVisibleData release];
-	mVisibleData = [visibleData retain];
+	mVisibleData = visibleData;
 	mVisibleCount = [mVisibleData count];
 	mVisibleCount2 = MIN(100, mVisibleCount);
 	
-	[visibleData release];
 	
 	[mTableView insertRowsAtIndexes:[NSIndexSet indexSetWithIndexesInRange:NSMakeRange(0,mVisibleCount2)] withAnimation:NSTableViewAnimationSlideLeft];
 }
@@ -556,9 +540,7 @@ done:
  */
 - (void)doHandleBuddySelectionChanged:(NSNotification *)aNotification
 {
-	[mFilterAccounts release];
-	mFilterAccounts = [[aNotification object] retain];
-	
+	mFilterAccounts = [aNotification object];
 	dispatch_semaphore_signal(mFilterSem);
 }
 
@@ -568,88 +550,82 @@ done:
  */
 - (void)filterThread
 {
-	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-	ChatterObjectCache *cache = [ChatterObjectCache sharedInstance];
-	
-	mIsFiltered = FALSE;
-	
-	while (!mStopFiltering) {
-		dispatch_semaphore_wait(mFilterSem, DISPATCH_TIME_FOREVER);
+	@autoreleasepool {
+		ChatterObjectCache *cache = [ChatterObjectCache sharedInstance];
 		
-		if (mStopFiltering)
-			break;
+		mIsFiltered = FALSE;
 		
-		NSAutoreleasePool *pool2 = [[NSAutoreleasePool alloc] init];
-		
-		[Easy postNotification:@"ChatterNotificationProgressTextChanged" object:@"Filtering..."];
-		
-		// if all or none of the accounts are selected, do not filter the messages
-		if ([mFilterAccounts count] == 0 || [mFilterAccounts count] == [cache accountCount]) {
-			[mFilterData release];
-			mFilterData = nil;
-			
-			[mFilterIds release];
-			mFilterIds = nil;
-			
-			mIsFiltered = FALSE;
-		}
-		
-		// use the subset of messages associated with the selected accounts
-		else {
-			NSMutableArray *cmessages = [NSMutableArray array];
-			NSMutableIndexSet *messageIds = [NSMutableIndexSet indexSet];
-			NSMutableIndexSet *sessionIds = [NSMutableIndexSet indexSet];
-			
-			for (ChatterObject *cobject in mFilterAccounts) {
-				if (mStopFiltering)
-					goto done;
-				
-				if ([cobject isKindOfClass:[ChatterAccount class]]) {
-					[ChatterSessionAccount dbobjectSelectSessionIDsForAccount:(ChatterAccount *)cobject withHandler:(^ BOOL (NSUInteger sessionId) {
-						[sessionIds addIndex:sessionId];
-						return !mStopFiltering;
-					})];
-				}
-				else if ([cobject isKindOfClass:[ChatterPerson class]]) {
-					[ChatterSessionAccount dbobjectSelectSessionIDsForPerson:(ChatterPerson *)cobject withHandler:(^ BOOL (NSUInteger sessionId) {
-						[sessionIds addIndex:sessionId];
-						return !mStopFiltering;
-					})];
-				}
-			}
-			
-			[sessionIds enumerateIndexesUsingBlock:(^ (NSUInteger sessionId, BOOL *stop) {
-				if (mStopFiltering)
-					*stop = TRUE;
-				[ChatterMessage dbobjectSelectIDsForSessionId:sessionId withHandler:(^ BOOL (NSUInteger messageId) {
-					[cmessages addObject:[cache messageForId:messageId]];
-					[messageIds addIndex:messageId];
-					return !mStopFiltering;
-				})];
-			})];
+		while (!mStopFiltering) {
+			dispatch_semaphore_wait(mFilterSem, DISPATCH_TIME_FOREVER);
 			
 			if (mStopFiltering)
-				goto done;
+				break;
 			
-			[mFilterData release];
-			mFilterData = [cmessages retain];
+			@autoreleasepool {
+				[Easy postNotification:@"ChatterNotificationProgressTextChanged" object:@"Filtering..."];
+				
+				// if all or none of the accounts are selected, do not filter the messages
+				if ([mFilterAccounts count] == 0 || [mFilterAccounts count] == [cache accountCount]) {
+					mFilterData = nil;
+					
+					mFilterIds = nil;
+					
+					mIsFiltered = FALSE;
+				}
+				
+				// use the subset of messages associated with the selected accounts
+				else {
+					NSMutableArray *cmessages = [NSMutableArray array];
+					NSMutableIndexSet *messageIds = [NSMutableIndexSet indexSet];
+					NSMutableIndexSet *sessionIds = [NSMutableIndexSet indexSet];
+					
+					for (ChatterObject *cobject in mFilterAccounts) {
+						if (mStopFiltering)
+							goto done;
+						
+						if ([cobject isKindOfClass:[ChatterAccount class]]) {
+							[ChatterSessionAccount dbobjectSelectSessionIDsForAccount:(ChatterAccount *)cobject withHandler:(^ BOOL (NSUInteger sessionId) {
+								[sessionIds addIndex:sessionId];
+								return !mStopFiltering;
+							})];
+						}
+						else if ([cobject isKindOfClass:[ChatterPerson class]]) {
+							[ChatterSessionAccount dbobjectSelectSessionIDsForPerson:(ChatterPerson *)cobject withHandler:(^ BOOL (NSUInteger sessionId) {
+								[sessionIds addIndex:sessionId];
+								return !mStopFiltering;
+							})];
+						}
+					}
+					
+					[sessionIds enumerateIndexesUsingBlock:(^ (NSUInteger sessionId, BOOL *stop) {
+						if (mStopFiltering)
+							*stop = TRUE;
+						[ChatterMessage dbobjectSelectIDsForSessionId:sessionId withHandler:(^ BOOL (NSUInteger messageId) {
+							[cmessages addObject:[cache messageForId:messageId]];
+							[messageIds addIndex:messageId];
+							return !mStopFiltering;
+						})];
+					})];
+					
+					if (mStopFiltering)
+						goto done;
+					
+					mFilterData = cmessages;
+					
+					mFilterIds = messageIds;
+					
+					mIsFiltered = TRUE;
+				}
+				
+				[Easy postNotification:@"ChatterNotificationProgressTextChanged" object:@""];
+			}
 			
-			[mFilterIds release];
-			mFilterIds = [messageIds retain];
-			
-			mIsFiltered = TRUE;
-			
-			[pool2 release];
+			dispatch_semaphore_signal(mRenderSem);
 		}
 		
-		[Easy postNotification:@"ChatterNotificationProgressTextChanged" object:@""];
-		
-		dispatch_semaphore_signal(mRenderSem);
-	}
-	
 done:
-	[Easy postNotification:@"ChatterNotificationProgressTextChanged" object:@""];
-	[pool release];
+		[Easy postNotification:@"ChatterNotificationProgressTextChanged" object:@""];
+	}
 }
 
 /**
@@ -660,13 +636,12 @@ done:
 {
 	NSString *queryString = [notification object];
 	
-	[mQueryString release];
-	mQueryString = [queryString retain];
+	mQueryString = queryString;
 	
 	mLastQueryChange = [NSDate timeIntervalSinceReferenceDate];
 	
 	if (mQueryTimer == nil)
-		mQueryTimer = [[NSTimer scheduledTimerWithTimeInterval:0.5 target:self selector:@selector(queryChangeTimer:) userInfo:nil repeats:TRUE] retain];
+		mQueryTimer = [NSTimer scheduledTimerWithTimeInterval:0.5 target:self selector:@selector(queryChangeTimer:) userInfo:nil repeats:TRUE];
 }
 
 /**
@@ -680,7 +655,6 @@ done:
 	
 	[timer invalidate];
 	
-	[mQueryTimer release];
 	mQueryTimer = nil;
 	
 	dispatch_semaphore_signal(mSearchSem);
@@ -692,19 +666,16 @@ done:
  */
 - (void)searchThread
 {
-	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-	MessageSearch *messageSearch = [[[MessageSearch alloc] init] autorelease];
+	MessageSearch *messageSearch = [[MessageSearch alloc] init];
 	void (^searchHandler)(NSArray*, NSIndexSet*);
 	
 	searchHandler = ^ (NSArray *cmessages, NSIndexSet *messageIds) {
 		if (mStopSearching)
 			return;
 		
-		[mSearchData release];
-		mSearchData = [cmessages retain];
+		mSearchData = cmessages;
 		
-		[mSearchIds release];
-		mSearchIds = [messageIds retain];
+		mSearchIds = (NSMutableIndexSet *)messageIds;
 		
 		mIsSearched = TRUE;
 		
@@ -719,45 +690,39 @@ done:
 		if (mStopSearching)
 			break;
 		
-		NSAutoreleasePool *pool2 = [[NSAutoreleasePool alloc] init];
-		
-		[Easy postNotification:@"ChatterNotificationProgressTextChanged" object:@"Searching..."];
-		
-		// if there's a search taking place already, tell it to stop and wait for it to stop
-		if (!messageSearch.isStopped) {
-			[messageSearch stop];
+		@autoreleasepool {
+			[Easy postNotification:@"ChatterNotificationProgressTextChanged" object:@"Searching..."];
 			
-			while (!messageSearch.isStopped)
-				usleep(100000);
+			// if there's a search taking place already, tell it to stop and wait for it to stop
+			if (!messageSearch.isStopped) {
+				[messageSearch stop];
+				
+				while (!messageSearch.isStopped)
+					usleep(100000);
+			}
+			
+			if ([mQueryString length] == 0) {
+				mSearchData = nil;
+				
+				mSearchIds = nil;
+				
+				mIsSearched = FALSE;
+				
+				[Easy postNotification:@"ChatterNotificationProgressTextChanged" object:@""];
+				
+				dispatch_semaphore_signal(mRenderSem);
+			}
+			else {
+				NSString *queryString = mQueryString;
+				
+				NSArray *sortedData = [mData sortedArrayUsingComparator:(^ NSComparisonResult (id obj1, id obj2) {
+					return [((ChatterMessage *)obj1).timestampStr compare:((ChatterMessage *)obj2).timestampStr];
+				})];
+				
+				[messageSearch searchData:sortedData withQuery:queryString inBackground:TRUE andHandler:searchHandler];
+			}
 		}
-		
-		if ([mQueryString length] == 0) {
-			[mSearchData release];
-			mSearchData = nil;
-			
-			[mSearchIds release];
-			mSearchIds = nil;
-			
-			mIsSearched = FALSE;
-			
-			[Easy postNotification:@"ChatterNotificationProgressTextChanged" object:@""];
-			
-			dispatch_semaphore_signal(mRenderSem);
-		}
-		else {
-			NSString *queryString = [[mQueryString retain] autorelease];
-			
-			NSArray *sortedData = [[mData sortedArrayUsingComparator:(^ NSComparisonResult (id obj1, id obj2) {
-				return [((ChatterMessage *)obj1).timestampStr compare:((ChatterMessage *)obj2).timestampStr];
-			})] retain];
-			
-			[messageSearch searchData:sortedData withQuery:queryString inBackground:TRUE andHandler:searchHandler];
-		}
-		
-		[pool2 release];
 	}
-	
-	[pool release];
 }
 
 
@@ -860,11 +825,11 @@ done:
 		MessageView *view = [tableView makeViewWithIdentifier:@"MessageView" owner:self];
 		CGColorRef bubbleColor = NULL;
 		
-		if (NULL == (bubbleColor = (CGColorRef)[mBubbleColorsByAccountId objectForKey:[NSNumber numberWithInteger:cmessage.accountId]]))
-			bubbleColor = (CGColorRef)[mBubbleColorsByAccountId objectForKey:[NSNumber numberWithInteger:cmessage.account.personId]];
+		if (NULL == (bubbleColor = (__bridge CGColorRef)[mBubbleColorsByAccountId objectForKey:[NSNumber numberWithInteger:cmessage.accountId]]))
+			bubbleColor = (__bridge CGColorRef)[mBubbleColorsByAccountId objectForKey:[NSNumber numberWithInteger:cmessage.account.personId]];
 		
 		if (view == nil) {
-			view = [[[MessageView alloc] initWithFrame:NSMakeRect(0., 0., [tableView frame].size.width, 0.)] autorelease];
+			view = [[MessageView alloc] initWithFrame:NSMakeRect(0., 0., [tableView frame].size.width, 0.)];
 			view.identifier = @"MessageView";
 		}
 		
@@ -886,18 +851,18 @@ done:
 					
 					if (prevMessage.accountId == cmessage.accountId) {
 						if (!bubbleColor)
-							bubbleColor = (CGColorRef)[mBubbleColorsByAccountId objectForKey:[NSNumber numberWithInteger:cmessage.accountId]];
+							bubbleColor = (__bridge CGColorRef)[mBubbleColorsByAccountId objectForKey:[NSNumber numberWithInteger:cmessage.accountId]];
 						isTop = FALSE;
 					}
 					else {
 						if ((caccount = cmessage.account) && (prevAccount = prevMessage.account) == caccount) {
 							if (!bubbleColor)
-								bubbleColor = (CGColorRef)[mBubbleColorsByAccountId objectForKey:[NSNumber numberWithInteger:prevMessage.accountId]];
+								bubbleColor = (__bridge CGColorRef)[mBubbleColorsByAccountId objectForKey:[NSNumber numberWithInteger:prevMessage.accountId]];
 							isTop = FALSE;
 						}
 						else if ((cperson = caccount.person) && (prevPerson = prevAccount.person) == cperson) {
 							if (!bubbleColor)
-								bubbleColor = (CGColorRef)[mBubbleColorsByPersonId objectForKey:[NSNumber numberWithInteger:prevPerson.databaseId]];
+								bubbleColor = (__bridge CGColorRef)[mBubbleColorsByPersonId objectForKey:[NSNumber numberWithInteger:prevPerson.databaseId]];
 							isTop = FALSE;
 						}
 					}
@@ -912,18 +877,18 @@ done:
 					
 					if (nextMessage.accountId == cmessage.accountId) {
 						if (!bubbleColor)
-							bubbleColor = (CGColorRef)[mBubbleColorsByAccountId objectForKey:[NSNumber numberWithInteger:cmessage.accountId]];
+							bubbleColor = (__bridge CGColorRef)[mBubbleColorsByAccountId objectForKey:[NSNumber numberWithInteger:cmessage.accountId]];
 						isBottom = FALSE;
 					}
 					else {
 						if ((caccount = cmessage.account) && (nextAccount = nextMessage.account) == caccount) {
 							if (!bubbleColor)
-								bubbleColor = (CGColorRef)[mBubbleColorsByAccountId objectForKey:[NSNumber numberWithInteger:nextMessage.accountId]];
+								bubbleColor = (__bridge CGColorRef)[mBubbleColorsByAccountId objectForKey:[NSNumber numberWithInteger:nextMessage.accountId]];
 							isBottom = FALSE;
 						}
 						else if ((cperson = caccount.person) && (nextPerson = nextAccount.person) == cperson) {
 							if (!bubbleColor)
-								bubbleColor = (CGColorRef)[mBubbleColorsByPersonId objectForKey:[NSNumber numberWithInteger:nextPerson.databaseId]];
+								bubbleColor = (__bridge CGColorRef)[mBubbleColorsByPersonId objectForKey:[NSNumber numberWithInteger:nextPerson.databaseId]];
 							isBottom = FALSE;
 						}
 					}
@@ -935,10 +900,10 @@ done:
 					bubbleColor = mBubbleColors[(mBubbleIndex++ % mBubbleCount)];
 				
 				if (cmessage.accountId != 0)
-					[mBubbleColorsByAccountId setObject:(NSObject *)bubbleColor forKey:[NSNumber numberWithInteger:cmessage.accountId]];
+					[mBubbleColorsByAccountId setObject:(__bridge NSObject *)bubbleColor forKey:[NSNumber numberWithInteger:cmessage.accountId]];
 				
 				if (cmessage.account.personId != 0)
-					[mBubbleColorsByPersonId setObject:(NSObject *)bubbleColor forKey:[NSNumber numberWithInteger:cmessage.account.personId]];
+					[mBubbleColorsByPersonId setObject:(__bridge NSObject *)bubbleColor forKey:[NSNumber numberWithInteger:cmessage.account.personId]];
 			}
 			
 			view.tableView = tableView;
@@ -966,7 +931,7 @@ done:
 		MessageGroupView *view = [tableView makeViewWithIdentifier:@"MessageGroupView" owner:self];
 		
 		if (view == nil) {
-			view = [[[MessageGroupView alloc] initWithFrame:NSMakeRect(0., 0., [tableView frame].size.width, 0.)] autorelease];
+			view = [[MessageGroupView alloc] initWithFrame:NSMakeRect(0., 0., [tableView frame].size.width, 0.)];
 			view.identifier = @"MessageGroupView";
 		}
 		

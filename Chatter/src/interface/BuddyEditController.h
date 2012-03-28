@@ -58,8 +58,8 @@
 	NSMutableArray *mAccounts;
 }
 
-@property (readwrite, retain) ChatterAccount *account;
-@property (readwrite, retain) ChatterPerson *person;
+@property (readwrite, strong) ChatterAccount *account;
+@property (readwrite, strong) ChatterPerson *person;
 
 - (void)showInWindow:(NSWindow *)window;
 

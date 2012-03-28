@@ -35,10 +35,8 @@
 	if ([[pboard types] containsObject:NSFilenamesPboardType]) {
 		NSArray *files = [pboard propertyListForType:NSFilenamesPboardType];
 		
-		if ([files count] != 0) {
-			[mImageFilePath release];
-			mImageFilePath = [[files objectAtIndex:0] retain];
-		}
+		if ([files count] != 0)
+			mImageFilePath = [files objectAtIndex:0];
 	}
 	
 	[self.window makeFirstResponder:self];

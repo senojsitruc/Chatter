@@ -16,7 +16,7 @@
  */
 + (NSDictionary *)metadataAttributesForFilePath:(NSString *)filePath
 {
-	MDItemRef mditem = MDItemCreate(kCFAllocatorDefault, (CFStringRef)filePath);
+	MDItemRef mditem = MDItemCreate(kCFAllocatorDefault, (__bridge CFStringRef)filePath);
 	CFArrayRef attributeNames = NULL;
 	CFDictionaryRef attributeValues = NULL;
 	NSMutableDictionary *attributes = [NSMutableDictionary dictionary];
@@ -36,8 +36,8 @@
 		goto done;
 	}
 	
-	for (NSObject *key in (NSDictionary *)attributeValues)
-		[attributes setObject:[(NSDictionary *)attributeValues objectForKey:key] forKey:key];
+	for (NSObject *key in (__bridge NSDictionary *)attributeValues)
+		[attributes setObject:[(__bridge NSDictionary *)attributeValues objectForKey:key] forKey:key];
 	
 done:
 	if (mditem != NULL)

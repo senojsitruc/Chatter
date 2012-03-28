@@ -46,19 +46,6 @@
  *
  *
  */
-- (void)dealloc
-{
-	[mMessages release];
-	[mQuery release];
-	[mHandler release];
-	
-	[super dealloc];
-}
-
-/**
- *
- *
- */
 - (void)stop
 {
 	mStop = TRUE;
@@ -72,14 +59,11 @@
 {
 	mStop = FALSE;
 	
-	[mMessages release];
-	mMessages = [data retain];
+	mMessages = data;
 	
-	[mQuery release];
-	mQuery = [query retain];
+	mQuery = query;
 	
-	[mHandler release];
-	mHandler = [[handler copy] retain];
+	mHandler = [handler copy];
 	
 	if (background)
 		[NSThread detachNewThreadSelector:@selector(search) toTarget:self withObject:nil];
@@ -93,60 +77,60 @@
  */
 - (void)search
 {
-	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-	ChatterObjectCache *cache = [ChatterObjectCache sharedInstance];
-	NSIndexSet *messageIds = nil;
-	NSMutableIndexSet *indexesOfHits = [NSMutableIndexSet indexSet];
-	
-	for (NSString *word in [Stemmer stemsForWords:mQuery]) {
-		ChatterWord *cword = [cache wordForWord:word];
-		NSMutableIndexSet *idsForWord = [NSMutableIndexSet indexSet];
+	@autoreleasepool {
+		ChatterObjectCache *cache = [ChatterObjectCache sharedInstance];
+		NSIndexSet *messageIds = nil;
+		NSMutableIndexSet *indexesOfHits = [NSMutableIndexSet indexSet];
+		
+		for (NSString *word in [Stemmer stemsForWords:mQuery]) {
+			ChatterWord *cword = [cache wordForWord:word];
+			NSMutableIndexSet *idsForWord = [NSMutableIndexSet indexSet];
+			
+			if (mStop)
+				goto done;
+			
+			if (cword == nil)
+				continue;
+			
+			[ChatterMessageWord dbobjectSelectMessageIdsForWord:cword withHandler:(^ BOOL (NSUInteger messageId) {
+				if (mStop)
+					return FALSE;
+				[idsForWord addIndex:messageId];
+				return !mStop;
+			})];
+			
+			if (messageIds == nil)
+				messageIds = idsForWord;
+			else
+				messageIds = [messageIds intersectionWithIndexes:idsForWord];
+		}
 		
 		if (mStop)
 			goto done;
 		
-		if (cword == nil)
-			continue;
-		
-		[ChatterMessageWord dbobjectSelectMessageIdsForWord:cword withHandler:(^ BOOL (NSUInteger messageId) {
-			if (mStop)
-				return FALSE;
-			[idsForWord addIndex:messageId];
-			return !mStop;
-		})];
-		
-		if (messageIds == nil)
-			messageIds = idsForWord;
-		else
-			messageIds = [messageIds intersectionWithIndexes:idsForWord];
-	}
-	
-	if (mStop)
-		goto done;
-	
-	// find the indexes of the search results within the searched data set
-	{
-		NSUInteger index = 0;
-		
-		for (ChatterMessage *cmessage in mMessages) {
-			if (mStop)
-				goto done;
+		// find the indexes of the search results within the searched data set
+		{
+			NSUInteger index = 0;
 			
-			if ([messageIds containsIndex:cmessage.databaseId])
-				[indexesOfHits addIndex:index];
-			
-			index += 1;
+			for (ChatterMessage *cmessage in mMessages) {
+				if (mStop)
+					goto done;
+				
+				if ([messageIds containsIndex:cmessage.databaseId])
+					[indexesOfHits addIndex:index];
+				
+				index += 1;
+			}
 		}
-	}
-	
-	if (mStop)
-		goto done;
-	
-	mHandler([mMessages objectsAtIndexes:indexesOfHits], messageIds);
-	
+		
+		if (mStop)
+			goto done;
+		
+		mHandler([mMessages objectsAtIndexes:indexesOfHits], messageIds);
+		
 done:
-	mStopped = TRUE;
-	[pool release];
+		mStopped = TRUE;
+	}
 }
 
 @end

@@ -60,26 +60,14 @@
 	self = [super initWithWindowNibName:@"ConversationController"];
 	
 	if (self) {
-		mData = [[messages sortedArrayUsingComparator:(^ NSComparisonResult (id obj1, id obj2) {
+		mData = [messages sortedArrayUsingComparator:(^ NSComparisonResult (id obj1, id obj2) {
 			return [((ChatterMessage *)obj1).timestampStr compare:((ChatterMessage *)obj2).timestampStr];
-		})] retain];
+		})];
 		
 		[[[self self] window] contentView];
 	}
 	
 	return self;
-}
-
-/**
- *
- *
- */
-- (void)dealloc
-{
-	[mData release];
-	[mSession release];
-	
-	[super dealloc];
 }
 
 
@@ -131,11 +119,10 @@
 	
 	ChatterObjectCache *cache = [ChatterObjectCache sharedInstance];
 	NSMutableIndexSet *accountIds = [[NSMutableIndexSet alloc] init];
-	__block NSMutableString *windowTitle = [[NSMutableString alloc] init];
+	NSMutableString *windowTitle = [[NSMutableString alloc] init];
 	__block NSUInteger accountCount = 0;
 	
-	[mSession release];
-	mSession = [csession retain];
+	mSession = csession;
 	
 	[windowTitle appendString:@"Conversation with "];
 	
@@ -161,8 +148,6 @@
 	
 	[[self window] setTitle:windowTitle];
 	
-	[windowTitle release];
-	[accountIds release];
 }
 
 
@@ -215,15 +200,15 @@
 		return nil;
 	}
 	
-	ChatterMessage *cmessage = [[mData objectAtIndex:row] retain];
+	ChatterMessage *cmessage = [mData objectAtIndex:row];
 	MessageView *view = [tableView makeViewWithIdentifier:@"MessageView" owner:self];
 	CGColorRef bubbleColor = NULL;
 	
-	if (NULL == (bubbleColor = (CGColorRef)[mBubbleColorsByAccountId objectForKey:[NSNumber numberWithInteger:cmessage.accountId]]))
-		bubbleColor = (CGColorRef)[mBubbleColorsByAccountId objectForKey:[NSNumber numberWithInteger:cmessage.account.personId]];
+	if (NULL == (bubbleColor = (__bridge CGColorRef)[mBubbleColorsByAccountId objectForKey:[NSNumber numberWithInteger:cmessage.accountId]]))
+		bubbleColor = (__bridge CGColorRef)[mBubbleColorsByAccountId objectForKey:[NSNumber numberWithInteger:cmessage.account.personId]];
 	
 	if (view == nil) {
-		view = [[[MessageView alloc] initWithFrame:NSMakeRect(0., 0., [tableView frame].size.width, 0.)] autorelease];
+		view = [[MessageView alloc] initWithFrame:NSMakeRect(0., 0., [tableView frame].size.width, 0.)];
 		view.identifier = @"MessageView";
 	}
 	
@@ -245,18 +230,18 @@
 				
 				if (prevMessage.accountId == cmessage.accountId) {
 					if (!bubbleColor)
-						bubbleColor = (CGColorRef)[mBubbleColorsByAccountId objectForKey:[NSNumber numberWithInteger:cmessage.accountId]];
+						bubbleColor = (__bridge CGColorRef)[mBubbleColorsByAccountId objectForKey:[NSNumber numberWithInteger:cmessage.accountId]];
 					isTop = FALSE;
 				}
 				else {
 					if ((caccount = cmessage.account) && (prevAccount = prevMessage.account) == caccount) {
 						if (!bubbleColor)
-							bubbleColor = (CGColorRef)[mBubbleColorsByAccountId objectForKey:[NSNumber numberWithInteger:prevMessage.accountId]];
+							bubbleColor = (__bridge CGColorRef)[mBubbleColorsByAccountId objectForKey:[NSNumber numberWithInteger:prevMessage.accountId]];
 						isTop = FALSE;
 					}
 					else if ((cperson = caccount.person) && (prevPerson = prevAccount.person) == cperson) {
 						if (!bubbleColor)
-							bubbleColor = (CGColorRef)[mBubbleColorsByPersonId objectForKey:[NSNumber numberWithInteger:prevPerson.databaseId]];
+							bubbleColor = (__bridge CGColorRef)[mBubbleColorsByPersonId objectForKey:[NSNumber numberWithInteger:prevPerson.databaseId]];
 						isTop = FALSE;
 					}
 				}
@@ -271,18 +256,18 @@
 				
 				if (nextMessage.accountId == cmessage.accountId) {
 					if (!bubbleColor)
-						bubbleColor = (CGColorRef)[mBubbleColorsByAccountId objectForKey:[NSNumber numberWithInteger:cmessage.accountId]];
+						bubbleColor = (__bridge CGColorRef)[mBubbleColorsByAccountId objectForKey:[NSNumber numberWithInteger:cmessage.accountId]];
 					isBottom = FALSE;
 				}
 				else {
 					if ((caccount = cmessage.account) && (nextAccount = nextMessage.account) == caccount) {
 						if (!bubbleColor)
-							bubbleColor = (CGColorRef)[mBubbleColorsByAccountId objectForKey:[NSNumber numberWithInteger:nextMessage.accountId]];
+							bubbleColor = (__bridge CGColorRef)[mBubbleColorsByAccountId objectForKey:[NSNumber numberWithInteger:nextMessage.accountId]];
 						isBottom = FALSE;
 					}
 					else if ((cperson = caccount.person) && (nextPerson = nextAccount.person) == cperson) {
 						if (!bubbleColor)
-							bubbleColor = (CGColorRef)[mBubbleColorsByPersonId objectForKey:[NSNumber numberWithInteger:nextPerson.databaseId]];
+							bubbleColor = (__bridge CGColorRef)[mBubbleColorsByPersonId objectForKey:[NSNumber numberWithInteger:nextPerson.databaseId]];
 						isBottom = FALSE;
 					}
 				}
@@ -294,10 +279,10 @@
 				bubbleColor = mBubbleColors[(mBubbleIndex++ % mBubbleCount)];
 			
 			if (cmessage.accountId != 0)
-				[mBubbleColorsByAccountId setObject:(NSObject *)bubbleColor forKey:[NSNumber numberWithInteger:cmessage.accountId]];
+				[mBubbleColorsByAccountId setObject:(__bridge NSObject *)bubbleColor forKey:[NSNumber numberWithInteger:cmessage.accountId]];
 			
 			if (cmessage.account.personId != 0)
-				[mBubbleColorsByPersonId setObject:(NSObject *)bubbleColor forKey:[NSNumber numberWithInteger:cmessage.account.personId]];
+				[mBubbleColorsByPersonId setObject:(__bridge NSObject *)bubbleColor forKey:[NSNumber numberWithInteger:cmessage.account.personId]];
 		}
 		
 		view.tableView = tableView;
@@ -316,8 +301,6 @@
 	
 	[view configureWithMessage:cmessage];
 	[view setBubbleColor:bubbleColor];
-	
-	[cmessage release];
 	
 	return view;
 }

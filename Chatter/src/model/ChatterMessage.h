@@ -40,18 +40,18 @@
 @property (readwrite, assign) NSUInteger accountId;
 @property (readwrite, assign) NSUInteger sourceId;
 @property (readwrite, assign) NSUInteger sessionId;
-@property (readwrite, retain) NSString *screenname;
-@property (readwrite, retain) NSDate *timestamp;
-@property (readwrite, retain) NSString *timestampStr;
+@property (readwrite, strong) NSString *screenname;
+@property (readwrite, strong) NSDate *timestamp;
+@property (readwrite, strong) NSString *timestampStr;
 @property (readwrite, assign) NSUInteger renderWidth;
 @property (readwrite, assign) NSUInteger renderHeight;
-@property (readwrite, retain) NSString *message;
+@property (readwrite, strong) NSString *message;
 
-@property (readwrite, assign) ChatterAccount *account;
-@property (readwrite, assign) ChatterSession *session;
-@property (readwrite, assign) ChatterSource *source;
+@property (readwrite, weak) ChatterAccount *account;
+@property (readwrite, weak) ChatterSession *session;
+@property (readwrite, weak) ChatterSource *source;
 
-@property (readwrite, retain) NSString *sessionName;
+@property (readwrite, strong) NSString *sessionName;
 
 + (id)message;
 

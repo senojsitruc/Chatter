@@ -51,18 +51,6 @@
 	return self;
 }
 
-/**
- *
- *
- */
-- (void)dealloc
-{
-	[mDescriptionTxt release];
-	[mMessage release];
-	
-	[super dealloc];
-}
-
 
 
 
@@ -113,8 +101,7 @@
 	ChatterObjectCache *cache = [ChatterObjectCache sharedInstance];
 	NSMutableString *description = [NSMutableString string];
 	
-	[mMessage release];
-	mMessage = [cmessage retain];
+	mMessage = cmessage;
 	
 	if (mIsChatGroup) {
 		NSMutableArray *participants = [[NSMutableArray alloc] init];
@@ -147,8 +134,6 @@
 			
 			participantsIndex += 1;
 		}
-		
-		[participants release];
 	}
 	
 	else if (mIsPersonGroup) {

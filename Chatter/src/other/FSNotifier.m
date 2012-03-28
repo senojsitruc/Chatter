@@ -27,12 +27,6 @@ void da_disk_disappeared_callback (DADiskRef dadisk, FSNotifierItem *item);
 @synthesize path = mPath;
 @synthesize isNetworkVolume = mIsNetworkVolume;
 
-- (void)dealloc
-{
-	[mPath release];
-	[super dealloc];
-}
-
 @end
 
 
@@ -67,11 +61,6 @@ void da_disk_disappeared_callback (DADiskRef dadisk, FSNotifierItem *item);
 
 - (void)dealloc
 {
-	[mSlType release];
-	[mSlKind release];
-	[mSlQuery release];
-	[mSlPredicate release];
-	
 	if (mFsEventStream != NULL) {
 		FSEventStreamRelease(mFsEventStream);
 		mFsEventStream = NULL;
@@ -81,11 +70,6 @@ void da_disk_disappeared_callback (DADiskRef dadisk, FSNotifierItem *item);
 		CFRelease(mDaSession);
 		mDaSession = NULL;
 	}
-	
-	[mFsPaths release];
-	[mFsRealPaths release];
-	
-	[super dealloc];
 }
 
 - (FSEventStreamRef)fseventstream
@@ -129,12 +113,6 @@ void da_disk_disappeared_callback (DADiskRef dadisk, FSNotifierItem *item);
 @synthesize target = mTarget;
 @synthesize action = mAction;
 
-- (void)dealloc
-{
-	[mObject release];
-	[mItem release];
-	[super dealloc];
-}
 
 @end
 
@@ -146,7 +124,7 @@ void da_disk_disappeared_callback (DADiskRef dadisk, FSNotifierItem *item);
 
 @synthesize path = mPath;
 @synthesize deleted = mDeleted;
-@synthesize retainCount = mRetainCount;
+@synthesize myRetainCount = mRetainCount;
 @synthesize modified = mModified;
 @synthesize target = mTarget;
 @synthesize action = mAction;
@@ -158,23 +136,14 @@ void da_disk_disappeared_callback (DADiskRef dadisk, FSNotifierItem *item);
 	
 	fspath.path = path;
 	fspath.deleted = ![fileManager fileExistsAtPath:path];
-	fspath.retainCount = 1;
+	fspath.myRetainCount = 1;
 	fspath.modified = [[[fileManager attributesOfItemAtPath:path error:nil] objectForKey:NSFileModificationDate] description];
 	fspath.target = anObject;
 	fspath.action = aSelector;
 	
-	[fileManager release];
-	
-	return [fspath autorelease];
+	return fspath;
 }
 
-- (void)dealloc
-{
-	[mPath release];
-	[mModified release];
-	
-	[super dealloc];
-}
 
 - (BOOL)isEqual:(id)anObject
 {
@@ -247,16 +216,7 @@ void da_disk_disappeared_callback (DADiskRef dadisk, FSNotifierItem *item);
 - (void)dealloc
 {
 	[[NSNotificationCenter defaultCenter] removeObserver:self];
-	
-	[mItemDict release];
-	[mQueryDict release];
-	[mEventQueue release];
-	[mVolumeMonitor release];
-	[mVolumes release];
-	
 	dispatch_release(mEventSem);
-	
-	[super dealloc];
 }
 
 
@@ -295,7 +255,7 @@ void da_disk_disappeared_callback (DADiskRef dadisk, FSNotifierItem *item);
 	// parameters: a file type and file kind.
 	item.sltype = type;
 	item.slkind = kind;
-	item.slquery = [[[NSMetadataQuery alloc] init] autorelease];
+	item.slquery = [[NSMetadataQuery alloc] init];
 	item.target = anObject;
 	item.action = aSelector;
 	
@@ -325,13 +285,12 @@ void da_disk_disappeared_callback (DADiskRef dadisk, FSNotifierItem *item);
 	// configure the metadata query: sort ascending (not really very important), only search local
 	// volumes and not network volumes (very important), pass in the predicate, set the search
 	// interval to only bug us once every five seconds (at most) and start the query.
-	[item.slquery setSortDescriptors:[NSArray arrayWithObject:[[[NSSortDescriptor alloc] initWithKey:(id)kMDItemFSName ascending:TRUE] autorelease]]];
+	[item.slquery setSortDescriptors:[NSArray arrayWithObject:[[NSSortDescriptor alloc] initWithKey:(id)kMDItemFSName ascending:TRUE]]];
 	[item.slquery setSearchScopes:[NSArray arrayWithObject:NSMetadataQueryLocalComputerScope]];
 	[item.slquery setPredicate:item.slpredicate];
 	[item.slquery setNotificationBatchingInterval:5.0];
 	[item.slquery startQuery];
 	
-	[item release];
 }
 
 /**
@@ -344,13 +303,12 @@ void da_disk_disappeared_callback (DADiskRef dadisk, FSNotifierItem *item);
 	NSString *key = [NSString stringWithFormat:@"%@:%@", type, kind];
 	
 	@synchronized (mItemDict) {
-		item = [[mItemDict objectForKey:key] retain];
+		item = [mItemDict objectForKey:key];
 		[mItemDict removeObjectForKey:key];
 		[mQueryDict removeObjectForKey:[[item.slquery predicate] predicateFormat]];
 	}
 	
 	[item.slquery stopQuery];
-	[item release];
 }
 
 
@@ -386,9 +344,9 @@ void da_disk_disappeared_callback (DADiskRef dadisk, FSNotifierItem *item);
 	// way of doing retain counts on the parent directory observer. when the last sub-dir is removed
 	// then we know to stop observing the parent directory.
 	@synchronized (mItemDict) {
-		if (nil != (item = [[mItemDict objectForKey:parent] retain])) {
+		if (nil != (item = [mItemDict objectForKey:parent])) {
 			if (nil != (fspath = [item.fsrealpaths objectForKey:path]))
-				fspath.retainCount = fspath.retainCount + 1;
+				fspath.myRetainCount = fspath.myRetainCount + 1;
 			else
 				[item.fsrealpaths setObject:[FSNotifierPath pathWithPath:path target:anObject action:aSelector] forKey:path];
 			goto done;
@@ -402,7 +360,7 @@ void da_disk_disappeared_callback (DADiskRef dadisk, FSNotifierItem *item);
 	// to our callback. this is a good thing.
 	memset(&context, 0, sizeof(context));
 	context.version = 0;
-	context.info = item;
+	context.info = (__bridge void *)item;
 	context.retain = NULL;
 	context.release = NULL;
 	context.copyDescription = NULL;
@@ -410,7 +368,7 @@ void da_disk_disappeared_callback (DADiskRef dadisk, FSNotifierItem *item);
 	// configure the NSNotifierItem
 	item.fspaths = [NSArray arrayWithObject:parent];
 	item.fslatency = 1.0;
-	item.fseventstream = FSEventStreamCreate(kCFAllocatorDefault, (FSEventStreamCallback)fsevent_callback, &context, (CFArrayRef)item.fspaths, kFSEventStreamEventIdSinceNow, item.fslatency, kFSEventStreamCreateFlagNone);
+	item.fseventstream = FSEventStreamCreate(kCFAllocatorDefault, (FSEventStreamCallback)fsevent_callback, &context, (__bridge CFArrayRef)item.fspaths, kFSEventStreamEventIdSinceNow, item.fslatency, kFSEventStreamCreateFlagNone);
 	
 	// start the event stream
 	FSEventStreamScheduleWithRunLoop(item.fseventstream, CFRunLoopGetMain(), kCFRunLoopDefaultMode);
@@ -419,7 +377,7 @@ void da_disk_disappeared_callback (DADiskRef dadisk, FSNotifierItem *item);
 	//NSLog(@"%s.. observing '%@' for '%@'", __PRETTY_FUNCTION__, parent, [path lastPathComponent]);
 	
 done:
-	[item release];
+	;
 }
 
 /**
@@ -435,11 +393,11 @@ done:
 	NSString *parent = [path stringByDeletingLastPathComponent];
 	
 	@synchronized (mItemDict) {
-		item = [[mItemDict objectForKey:parent] retain];
+		item = [mItemDict objectForKey:parent];
 		fspath = [item.fsrealpaths objectForKey:path];
 		
-		if (fspath.retainCount > 1)
-			fspath.retainCount = fspath.retainCount - 1;
+		if (fspath.myRetainCount > 1)
+			fspath.myRetainCount = fspath.myRetainCount - 1;
 		else
 			[item.fsrealpaths removeObjectForKey:path];
 		
@@ -450,7 +408,6 @@ done:
 		}
 	}
 	
-	[item release];
 }
 
 /**
@@ -473,7 +430,6 @@ done:
 		event.action = aSelector;
 		
 		[mEventQueue addObject:event];
-		[event release];
 		
 		if ([mEventQueue count] == 1)
 			dispatch_semaphore_signal(mEventSem);
@@ -504,8 +460,8 @@ done:
 	}
 	
 	// register to receive notifications when volumes mount/unmount
-	DARegisterDiskAppearedCallback(item.daSession, NULL, (DADiskAppearedCallback)da_disk_appeared_callback, item);
-	DARegisterDiskDisappearedCallback(item.daSession, NULL, (DADiskDisappearedCallback)da_disk_disappeared_callback, item);
+	DARegisterDiskAppearedCallback(item.daSession, NULL, (DADiskAppearedCallback)da_disk_appeared_callback, (__bridge void *)item);
+	DARegisterDiskDisappearedCallback(item.daSession, NULL, (DADiskDisappearedCallback)da_disk_disappeared_callback, (__bridge void *)item);
 	DASessionScheduleWithRunLoop(item.daSession, CFRunLoopGetMain(), kCFRunLoopDefaultMode);
 	
 	// there's an implict retain on DASessionCreate(), obviously, and then we retain it when we store
@@ -516,7 +472,6 @@ done:
 	self.volumeMonitor = item;
 	
 	// we retain it when we store it, so we need to release it now
-	[item release];
 }
 
 /**
@@ -528,8 +483,8 @@ done:
 	FSNotifierItem *item = self.volumeMonitor;
 	
 	// unregister for the mount/unmount notifications
-	DAUnregisterCallback(item.daSession, (DADiskAppearedCallback)da_disk_appeared_callback, item);
-	DAUnregisterCallback(item.daSession, (DADiskDisappearedCallback)da_disk_disappeared_callback, item);
+	DAUnregisterCallback(item.daSession, (DADiskAppearedCallback)da_disk_appeared_callback, (__bridge void *)item);
+	DAUnregisterCallback(item.daSession, (DADiskDisappearedCallback)da_disk_disappeared_callback, (__bridge void *)item);
 	
 	self.volumeMonitor = nil;
 }
@@ -557,7 +512,7 @@ done:
 	
 	// don't continue if this notification doesn't include an indication of whether this is a network
 	// volume.
-	if (nil == (network = (CFBooleanRef)[attributes objectForKey:@"DAVolumeNetwork"]))
+	if (nil == (network = (__bridge CFBooleanRef)[attributes objectForKey:@"DAVolumeNetwork"]))
 		return;
 	
 	// gather the attributes of the volume that we're interested in
@@ -572,7 +527,6 @@ done:
 	// post a notification that the volume appeared, to anyone who might be interested
 	[Easy postNotification:CZFSNotifierNotificationVolumeAppeared object:fsvolume];
 	
-	[fsvolume release];
 }
 
 /**
@@ -597,14 +551,13 @@ done:
 	
 	// remove the volume from our list of volumes
 	@synchronized (mVolumes) {
-		fsvolume = [[mVolumes objectForKey:[path path]] retain];
+		fsvolume = [mVolumes objectForKey:[path path]];
 		[mVolumes removeObjectForKey:[path path]];
 	}
 	
 	// post a notification that the volume appeared, to anyone who might be interested
 	[Easy postNotification:CZFSNotifierNotificationVolumeDisappeared object:fsvolume];
 	
-	[fsvolume release];
 }
 
 /**
@@ -617,13 +570,13 @@ done:
 	
 	@synchronized (mVolumes)
 	{
-		if (nil != (fsvolume = [[[mVolumes objectForKey:path] retain] autorelease]))
+		if (nil != (fsvolume = [mVolumes objectForKey:path]))
 			return fsvolume;
 		
 		for (NSString *mountPoint in mVolumes) {
 			if ([path hasPrefix:mountPoint])
 				if (fsvolume == nil || [mountPoint length] > [fsvolume.path length])
-					fsvolume = [[[mVolumes objectForKey:mountPoint] retain] autorelease];
+					fsvolume = [mVolumes objectForKey:mountPoint];
 		}
 	}
 	
@@ -637,7 +590,7 @@ done:
 void
 da_disk_appeared_callback (DADiskRef dadisk, FSNotifierItem *item)
 {
-	[item.notifier volumeAppeared:[(NSDictionary *)DADiskCopyDescription(dadisk) autorelease]];
+	[item.notifier volumeAppeared:(__bridge_transfer NSDictionary *)DADiskCopyDescription(dadisk)];
 }
 
 /**
@@ -647,7 +600,7 @@ da_disk_appeared_callback (DADiskRef dadisk, FSNotifierItem *item)
 void
 da_disk_disappeared_callback (DADiskRef dadisk, FSNotifierItem *item)
 {
-	[item.notifier volumeDisappeared:[(NSDictionary *)DADiskCopyDescription(dadisk) autorelease]];
+	[item.notifier volumeDisappeared:(__bridge_transfer NSDictionary *)DADiskCopyDescription(dadisk)];
 }
 
 
@@ -757,7 +710,6 @@ fsevent_callback (ConstFSEventStreamRef streamRef,
 	for (FSNotifierPath *fspath in [fspaths allValues])
 		[[FSNotifier mainInstance] postNotification:fspath.path forItem:item target:fspath.target action:fspath.action];
 	
-	[fileManager release];
 }
 
 /**
@@ -805,8 +757,7 @@ fsevent_callback (ConstFSEventStreamRef streamRef,
 
 
 
-#pragma mark -
-#pragma mark Thread
+#pragma mark - Thread
 
 /**
  *
@@ -814,33 +765,33 @@ fsevent_callback (ConstFSEventStreamRef streamRef,
  */
 - (void)eventLoop
 {
-	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-	FSNotifierEvent *event = nil;
-	
-	while (!mStop) {
-		NSAutoreleasePool *pool2 = [[NSAutoreleasePool alloc] init];
+	@autoreleasepool {
+		FSNotifierEvent *event = nil;
 		
-		@synchronized (mEventQueue) {
-			if ([mEventQueue count] != 0) {
-				event = [[mEventQueue objectAtIndex:0] retain];
-				[mEventQueue removeObjectAtIndex:0];
+		while (!mStop) {
+			@autoreleasepool {
+			
+				@synchronized (mEventQueue) {
+					if ([mEventQueue count] != 0) {
+						event = [mEventQueue objectAtIndex:0];
+						[mEventQueue removeObjectAtIndex:0];
+					}
+				}
+				
+				if (event == nil) {
+					dispatch_semaphore_wait(mEventSem, DISPATCH_TIME_FOREVER);
+					continue;
+				}
+				
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+				[event.target performSelector:event.action withObject:event.item withObject:event.object];
+#pragma clang diagnostic pop
+				event = nil;
 			}
 		}
-		
-		if (event == nil) {
-			[pool2 release];
-			dispatch_semaphore_wait(mEventSem, DISPATCH_TIME_FOREVER);
-			continue;
-		}
-		
-		[event.target performSelector:event.action withObject:event.item withObject:event.object];
-		[event release];
-		event = nil;
-		
-		[pool2 release];
-	}
 	
-	[pool release];
+	}
 }
 
 @end

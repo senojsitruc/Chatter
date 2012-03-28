@@ -29,7 +29,7 @@ extern NSString * const CZFSNotifierNotificationVolumeDisappeared;
 	BOOL mIsNetworkVolume;            // is network volume
 }
 
-@property (readwrite, retain) NSString *path;
+@property (readwrite, strong) NSString *path;
 @property (readwrite, assign) BOOL isNetworkVolume;
 
 @end
@@ -56,25 +56,25 @@ extern NSString * const CZFSNotifierNotificationVolumeDisappeared;
 	DASessionRef mDaSession;          // disk abritration - session
 	
 	/* callback */
-	id mTarget;                       // callback object
+	id __unsafe_unretained mTarget;                       // callback object
 	SEL mAction;                      // callback selector
 	
 	/* other */
-	FSNotifier *mNotifier;            // weak reference to an FSNotifier
+	FSNotifier *__weak mNotifier;            // weak reference to an FSNotifier
 }
 
-@property (readwrite, retain) NSString *sltype;
-@property (readwrite, retain) NSString *slkind;
-@property (readwrite, retain) NSMetadataQuery *slquery;
-@property (readwrite, retain) NSPredicate *slpredicate;
+@property (readwrite, strong) NSString *sltype;
+@property (readwrite, strong) NSString *slkind;
+@property (readwrite, strong) NSMetadataQuery *slquery;
+@property (readwrite, strong) NSPredicate *slpredicate;
 @property (readwrite, assign) FSEventStreamRef fseventstream;
 @property (readwrite, assign) CFTimeInterval fslatency;
-@property (readwrite, retain) NSArray *fspaths;
+@property (readwrite, strong) NSArray *fspaths;
 @property (readonly) NSMutableDictionary *fsrealpaths;
 @property (readwrite, assign) DASessionRef daSession;
-@property (readwrite, assign) id target;
+@property (readwrite, unsafe_unretained) id target;
 @property (readwrite, assign) SEL action;
-@property (readwrite, assign) FSNotifier *notifier;
+@property (readwrite, weak) FSNotifier *notifier;
 
 @end
 
@@ -86,13 +86,13 @@ extern NSString * const CZFSNotifierNotificationVolumeDisappeared;
 {
 	NSObject *mObject;                // a string path or an NSMetadataItem
 	FSNotifierItem *mItem;            // FSNotifierItem;
-	id mTarget;                       // callback object
+	id __unsafe_unretained mTarget;                       // callback object
 	SEL mAction;                      // callback selector
 }
 
-@property (readwrite, retain) NSObject *object;
-@property (readwrite, retain) FSNotifierItem *item;
-@property (readwrite, assign) id target;
+@property (readwrite, strong) NSObject *object;
+@property (readwrite, strong) FSNotifierItem *item;
+@property (readwrite, unsafe_unretained) id target;
 @property (readwrite, assign) SEL action;
 
 @end
@@ -107,15 +107,15 @@ extern NSString * const CZFSNotifierNotificationVolumeDisappeared;
 	BOOL mDeleted;                    // path was noted to be missing
 	NSString *mModified;              // file modification date
 	NSUInteger mRetainCount;          // retain count
-	id mTarget;                       // callback object
+	id __unsafe_unretained mTarget;                       // callback object
 	SEL mAction;                      // callback selector
 }
 
-@property (readwrite, retain) NSString *path;
+@property (readwrite, strong) NSString *path;
 @property (readwrite, assign) BOOL deleted;
-@property (readwrite, assign) NSUInteger retainCount;
-@property (readwrite, retain) NSString *modified;
-@property (readwrite, assign) id target;
+@property (readwrite, assign) NSUInteger myRetainCount;
+@property (readwrite, strong) NSString *modified;
+@property (readwrite, unsafe_unretained) id target;
 @property (readwrite, assign) SEL action;
 
 + (FSNotifierPath *)pathWithPath:(NSString *)path target:(id)anObject action:(SEL)aSelector;
@@ -137,7 +137,7 @@ extern NSString * const CZFSNotifierNotificationVolumeDisappeared;
 	NSMutableDictionary *mVolumes;    // FSVolume objects keyed on the volume mount point
 }
 
-@property (readwrite, retain) FSNotifierItem *volumeMonitor;
+@property (readwrite, strong) FSNotifierItem *volumeMonitor;
 
 /**
  *

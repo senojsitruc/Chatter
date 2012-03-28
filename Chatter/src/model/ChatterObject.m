@@ -28,7 +28,7 @@ static NSUInteger gObjectId = 1000000000U;
  */
 + (id)objectWithObjectId:(NSUInteger)objectId
 {
-	return [[[[self class] alloc] initWithObjectId:objectId] autorelease];
+	return [[[self class] alloc] initWithObjectId:objectId];
 }
 
 /**
@@ -74,15 +74,6 @@ static NSUInteger gObjectId = 1000000000U;
 	}
 	
 	return self;
-}
-
-/**
- *
- *
- */
-- (void)dealloc
-{
-	[super dealloc];
 }
 
 

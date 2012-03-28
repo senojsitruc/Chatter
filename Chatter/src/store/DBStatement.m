@@ -59,25 +59,11 @@
 	return self;
 }
 
-/**
- *
- *
- */
-- (void)dealloc
-{
-	[mQuery release];
-	[mName release];
-	[mValues release];
-	
-	[super dealloc];
-}
 
 
 
 
-
-#pragma mark -
-#pragma mark Accessors
+#pragma mark - Accessors
 
 /**
  *

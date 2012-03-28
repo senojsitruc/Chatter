@@ -135,7 +135,6 @@ done_good:
 	retval = TRUE;
 	
 done_fail:
-	[fileManager release];
 	return retval;
 }
 
@@ -154,25 +153,6 @@ done_fail:
 	}
 	
 	return self;
-}
-
-/**
- *
- *
- */
-- (void)dealloc
-{
-	[mXmlStr release];
-	[mMessageStr release];
-	[mFilePath release];
-	[mScreenName release];
-	[mTimestamp release];
-	[mServiceName release];
-	
-	[mBaseTimestamp release];
-	[mBaseCalendar release];
-	
-	[super dealloc];
 }
 
 
@@ -220,13 +200,10 @@ done_fail:
 	BOOL isDir = FALSE;
 	NSFileManager *fileManager = [[NSFileManager alloc] init];
 	
-	if (![fileManager fileExistsAtPath:filePath isDirectory:&isDir] || isDir) {
-		[fileManager release];
+	if (![fileManager fileExistsAtPath:filePath isDirectory:&isDir] || isDir)
 		return FALSE;
-	}
 	
-	[mFilePath release];
-	mFilePath = [filePath retain];
+	mFilePath = filePath;
 	
 	// "gossipingabby (2011-06-26T01.30.58-0400).html" -> "2011-06-26 01:30:58 -0400"
 	{
@@ -258,7 +235,6 @@ done_fail:
 		}
 	}
 	
-	[fileManager release];
 	
 	return [self importData:[NSData dataWithContentsOfFile:filePath] withMessageClass:messageClass andHandler:handler];
 }
@@ -269,40 +245,38 @@ done_fail:
  */
 - (BOOL)importData:(NSData *)data withMessageClass:(Class<ServiceImporterMessage>)messageClass andHandler:(ServiceImporterMessageCallback)handler
 {
-	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-	NSXMLParser *parser = [[NSXMLParser alloc] initWithData:data];
-	
-	mHandler = handler;
-	mMessageClass = messageClass;
-	
-	// determine whether this is the xml file format or the html file format
-	{
-		NSString *someData = [NSString stringWithCString:[data bytes] length:MIN([data length], 300) encoding:NSUTF8StringEncoding];
+	@autoreleasepool {
+		NSXMLParser *parser = [[NSXMLParser alloc] initWithData:data];
 		
-		if (NSNotFound != [someData rangeOfString:@"<chat "].location &&
-				NSNotFound != [someData rangeOfString:@"account="].location &&
-				NSNotFound != [someData rangeOfString:@"service=\"AIM\""].location &&
-				NSNotFound != [someData rangeOfString:@"<?xml "].location) {
-			mFileType = AIMFileTypeXml;
+		mHandler = handler;
+		mMessageClass = messageClass;
+		
+		// determine whether this is the xml file format or the html file format
+		{
+			NSString *someData = [NSString stringWithCString:[data bytes] length:MIN([data length], 300) encoding:NSUTF8StringEncoding];
+			
+			if (NSNotFound != [someData rangeOfString:@"<chat "].location &&
+					NSNotFound != [someData rangeOfString:@"account="].location &&
+					NSNotFound != [someData rangeOfString:@"service=\"AIM\""].location &&
+					NSNotFound != [someData rangeOfString:@"<?xml "].location) {
+				mFileType = AIMFileTypeXml;
+			}
+			// html
+			else if (NSNotFound != [someData rangeOfString:@"<html "].location &&
+							 NSNotFound != [someData rangeOfString:@"<head"].location &&
+							 NSNotFound != [someData rangeOfString:@"<style"].location &&
+							 NSNotFound != [someData rangeOfString:@"<?xml "].location) {
+				mFileType = AIMFileTypeHtml;
+			}
+			else
+				return FALSE;
 		}
-		// html
-		else if (NSNotFound != [someData rangeOfString:@"<html "].location &&
-						 NSNotFound != [someData rangeOfString:@"<head"].location &&
-						 NSNotFound != [someData rangeOfString:@"<style"].location &&
-						 NSNotFound != [someData rangeOfString:@"<?xml "].location) {
-			mFileType = AIMFileTypeHtml;
-		}
-		else
-			return FALSE;
+		
+		[parser setDelegate:self];
+		[parser parse];
+		
+		mHandler = nil;
 	}
-	
-	[parser setDelegate:self];
-	[parser parse];
-	[parser release];
-	
-	mHandler = nil;
-	
-	[pool release];
 	
 	return TRUE;
 }
@@ -354,16 +328,13 @@ done_fail:
 				// ...
 			}
 			else if ([elementName isEqualToString:@"message"]) {
-				[mScreenName release];
-				mScreenName = [[attributeDict objectForKey:@"sender"] retain];
-				[mTimestamp release];
-				mTimestamp = [[AIMImporter aimDateToStandard:[attributeDict objectForKey:@"time"]] retain];
+				mScreenName = [attributeDict objectForKey:@"sender"];
+				mTimestamp = [AIMImporter aimDateToStandard:[attributeDict objectForKey:@"time"]];
 				mInMessage = TRUE;
 			}
 		}
 		else if ([elementName isEqualToString:@"chat"]) {
-			[mServiceName release];
-			mServiceName = [[attributeDict objectForKey:@"account"] retain];
+			mServiceName = [attributeDict objectForKey:@"account"];
 			mInChat = TRUE;
 		}
 	}
@@ -421,7 +392,6 @@ done_fail:
 						if (stop)
 							[parser abortParsing];
 						
-						[message release];
 						[mXmlStr setString:@""];
 					}
 					
@@ -443,23 +413,20 @@ done_fail:
 				if (mInDivMessage) {
 					if ([elementName isEqualToString:@"span"]) {
 						if (mInSpanHeader) {
-							[mScreenName release];
 							if ([mXmlStr hasSuffix:@":"])
-								mScreenName = [[[mXmlStr substringToIndex:[mXmlStr length]-1] lowercaseString] retain];
+								mScreenName = [[mXmlStr substringToIndex:[mXmlStr length]-1] lowercaseString];
 							else
-								mScreenName = [[[NSString stringWithString:mXmlStr] lowercaseString] retain];
+								mScreenName = [[NSString stringWithString:mXmlStr] lowercaseString];
 							[mXmlStr setString:@""];
 							mInSpanHeader = FALSE;
 						}
 						else if (mInSpanTimestamp) {
-							[mTimestamp release];
-							mTimestamp = [[NSString stringWithString:mXmlStr] retain];
+							mTimestamp = [NSString stringWithString:mXmlStr];
 							[mXmlStr setString:@""];
 							mInSpanTimestamp = FALSE;
 						}
 						else if (mInSpanBody) {
-							[mMessageStr release];
-							mMessageStr = [[mXmlStr stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] retain];
+							mMessageStr = [mXmlStr stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
 							[mXmlStr setString:@""];
 							mInSpanBody = FALSE;
 						}
@@ -497,7 +464,6 @@ done_fail:
 						if (stop)
 							[parser abortParsing];
 						
-						[message release];
 						[mXmlStr setString:@""];
 						mInDivMessage = FALSE;
 					}

@@ -108,123 +108,120 @@
  */
 - (void)magicalSearchFindThread
 {
-	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-	NSFileManager *fileManager = [[NSFileManager alloc] init];
-	NSMutableArray *searches = [NSMutableArray array];
-	NSMutableDictionary *searchPaths = [NSMutableDictionary dictionary];
-	
-	//
-	// handle a file path
-	//
-	void (^handleFilePath)(NSString*, NSString*) = ^ (NSString *serviceName, NSString *path) {
-		NSMutableDictionary *serviceInfo = [mDataByService objectForKey:serviceName];
-		NSMutableDictionary *serviceFiles = [serviceInfo objectForKey:@"Files"];
+	@autoreleasepool {
+		NSMutableArray *searches = [NSMutableArray array];
+		NSMutableDictionary *searchPaths = [NSMutableDictionary dictionary];
 		
-		if (serviceInfo == nil) {
-			[mDataByService setObject:(serviceInfo = [NSMutableDictionary dictionary]) forKey:serviceName];
-			[serviceInfo setObject:[NSNumber numberWithInteger:NSOnState] forKey:@"State"];
-			[serviceInfo setObject:[NSNumber numberWithInteger:0] forKey:@"Count"];
-			[serviceInfo setObject:(serviceFiles = [NSMutableDictionary dictionary]) forKey:@"Files"];
-			@synchronized (mData) { [mData addObject:serviceName]; }
-		}
-		
-		[serviceFiles setObject:path forKey:path];
-		
-		@synchronized (serviceInfo) {
-			[serviceInfo setObject:[NSNumber numberWithInteger:[serviceFiles count]] forKey:@"Count"];
-		}
-		
-		[mMagicalTableView performSelectorOnMainThread:@selector(reloadData) withObject:nil waitUntilDone:FALSE];
-	};
-	
-	//
-	// handle a set of metadata items
-	//
-	void (^handleMetadataResults)(NSString*, NSArray*) = ^ (NSString *serviceName, NSArray *metadataItems) {
-		NSMutableDictionary *serviceInfo = [mDataByService objectForKey:serviceName];
-		NSMutableDictionary *serviceFiles = [serviceInfo objectForKey:@"Files"];
-		
-		if (serviceInfo == nil) {
-			[mDataByService setObject:(serviceInfo = [NSMutableDictionary dictionary]) forKey:serviceName];
-			[serviceInfo setObject:[NSNumber numberWithInteger:NSOnState] forKey:@"State"];
-			[serviceInfo setObject:[NSNumber numberWithInteger:0] forKey:@"Count"];
-			[serviceInfo setObject:(serviceFiles = [NSMutableDictionary dictionary]) forKey:@"Files"];
-			@synchronized (mData) { [mData addObject:serviceName]; }
-		}
-		
-		for (NSMetadataItem *metadataItem in metadataItems) {
-			NSString *path = [metadataItem valueForAttribute:NSMetadataItemPathKey];
+		//
+		// handle a file path
+		//
+		void (^handleFilePath)(NSString*, NSString*) = ^ (NSString *serviceName, NSString *path) {
+			NSMutableDictionary *serviceInfo = [mDataByService objectForKey:serviceName];
+			NSMutableDictionary *serviceFiles = [serviceInfo objectForKey:@"Files"];
+			
+			if (serviceInfo == nil) {
+				[mDataByService setObject:(serviceInfo = [NSMutableDictionary dictionary]) forKey:serviceName];
+				[serviceInfo setObject:[NSNumber numberWithInteger:NSOnState] forKey:@"State"];
+				[serviceInfo setObject:[NSNumber numberWithInteger:0] forKey:@"Count"];
+				[serviceInfo setObject:(serviceFiles = [NSMutableDictionary dictionary]) forKey:@"Files"];
+				@synchronized (mData) { [mData addObject:serviceName]; }
+			}
+			
 			[serviceFiles setObject:path forKey:path];
-		}
+			
+			@synchronized (serviceInfo) {
+				[serviceInfo setObject:[NSNumber numberWithInteger:[serviceFiles count]] forKey:@"Count"];
+			}
+			
+			[mMagicalTableView performSelectorOnMainThread:@selector(reloadData) withObject:nil waitUntilDone:FALSE];
+		};
 		
-		@synchronized (serviceInfo) {
-			[serviceInfo setObject:[NSNumber numberWithInteger:[serviceFiles count]] forKey:@"Count"];
-		}
+		//
+		// handle a set of metadata items
+		//
+		void (^handleMetadataResults)(NSString*, NSArray*) = ^ (NSString *serviceName, NSArray *metadataItems) {
+			NSMutableDictionary *serviceInfo = [mDataByService objectForKey:serviceName];
+			NSMutableDictionary *serviceFiles = [serviceInfo objectForKey:@"Files"];
+			
+			if (serviceInfo == nil) {
+				[mDataByService setObject:(serviceInfo = [NSMutableDictionary dictionary]) forKey:serviceName];
+				[serviceInfo setObject:[NSNumber numberWithInteger:NSOnState] forKey:@"State"];
+				[serviceInfo setObject:[NSNumber numberWithInteger:0] forKey:@"Count"];
+				[serviceInfo setObject:(serviceFiles = [NSMutableDictionary dictionary]) forKey:@"Files"];
+				@synchronized (mData) { [mData addObject:serviceName]; }
+			}
+			
+			for (NSMetadataItem *metadataItem in metadataItems) {
+				NSString *path = [metadataItem valueForAttribute:NSMetadataItemPathKey];
+				[serviceFiles setObject:path forKey:path];
+			}
+			
+			@synchronized (serviceInfo) {
+				[serviceInfo setObject:[NSNumber numberWithInteger:[serviceFiles count]] forKey:@"Count"];
+			}
+			
+			[mMagicalTableView performSelectorOnMainThread:@selector(reloadData) withObject:nil waitUntilDone:FALSE];
+		};
 		
-		[mMagicalTableView performSelectorOnMainThread:@selector(reloadData) withObject:nil waitUntilDone:FALSE];
-	};
-	
-	for (id<ServiceImporter> importer in [ServiceImporter importers]) {
-		Class importerClass = [importer class];
-		NSArray *contentTypes = [importerClass supportedContentTypes];
-		NSArray *typeCodes = [importerClass supportedTypeCodes];
-		NSArray *kinds = [importerClass supportedKinds];
-		NSArray *extensions = [importerClass supportedFileExtensions];
-		NSArray *_searchPaths = [importerClass supportedSearchPaths];
-		NSString *contentType=nil, *typeCode=nil, *kind=nil, *extension=nil;
-		
-		if (_searchPaths) {
-			for (NSString *searchPath in _searchPaths) {
-				[searchPaths setObject:importer forKey:searchPath];
+		for (id<ServiceImporter> importer in [ServiceImporter importers]) {
+			Class importerClass = [importer class];
+			NSArray *contentTypes = [importerClass supportedContentTypes];
+			NSArray *typeCodes = [importerClass supportedTypeCodes];
+			NSArray *kinds = [importerClass supportedKinds];
+			NSArray *extensions = [importerClass supportedFileExtensions];
+			NSArray *_searchPaths = [importerClass supportedSearchPaths];
+			NSString *contentType=nil, *typeCode=nil, *kind=nil, *extension=nil;
+			
+			if (_searchPaths) {
+				for (NSString *searchPath in _searchPaths) {
+					[searchPaths setObject:importer forKey:searchPath];
+				}
+			}
+			
+			if ([contentTypes count] != 0)
+				contentType = [contentTypes objectAtIndex:0];
+			
+			if ([typeCodes count] != 0)
+				typeCode = [typeCodes objectAtIndex:0];
+			
+			if ([kinds count] != 0)
+				kind = [kinds objectAtIndex:0];
+			
+			if ([extensions count] != 0)
+				extension = [@"*." stringByAppendingString:[extensions objectAtIndex:0]];
+			
+			if (contentType || typeCode || kind || extension) {
+				[searches addObject:[MetadataSearch searchByContentType:contentType andTypeCode:typeCode andKind:kind andName:extension withHandler:(^ (NSArray *metadataItems, BOOL *stop) {
+					handleMetadataResults([[importer class] name], metadataItems);
+				})]];
 			}
 		}
 		
-		if ([contentTypes count] != 0)
-			contentType = [contentTypes objectAtIndex:0];
-		
-		if ([typeCodes count] != 0)
-			typeCode = [typeCodes objectAtIndex:0];
-		
-		if ([kinds count] != 0)
-			kind = [kinds objectAtIndex:0];
-		
-		if ([extensions count] != 0)
-			extension = [@"*." stringByAppendingString:[extensions objectAtIndex:0]];
-		
-		if (contentType || typeCode || kind || extension) {
-			[searches addObject:[MetadataSearch searchByContentType:contentType andTypeCode:typeCode andKind:kind andName:extension withHandler:(^ (NSArray *metadataItems, BOOL *stop) {
-				handleMetadataResults([[importer class] name], metadataItems);
-			})]];
+		for (NSString *searchPath in [searchPaths allKeys]) {
+			id<ServiceImporter> importer = [searchPaths objectForKey:searchPath];
+			
+			[Easy iterateDirectory:[searchPath stringByExpandingTildeInPath] withHandle:(^ (NSString *path) {
+				if ([[importer class] canHandleFilePath:path])
+					handleFilePath([[importer class] name], path);
+			})];
 		}
-	}
-	
-	for (NSString *searchPath in [searchPaths allKeys]) {
-		id<ServiceImporter> importer = [searchPaths objectForKey:searchPath];
 		
-		[Easy iterateDirectory:[searchPath stringByExpandingTildeInPath] withHandle:(^ (NSString *path) {
-			if ([[importer class] canHandleFilePath:path])
-				handleFilePath([[importer class] name], path);
-		})];
-	}
-	
-	// stall until all of the searches are complete
-	while (!mStop && [searches count] != 0) {
-		[searches filterUsingPredicate:[NSPredicate predicateWithBlock:^ BOOL (id evaluatedObject, NSDictionary *bindings) {
-			return !((MetadataSearch *)evaluatedObject).isDone;
-		}]];
+		// stall until all of the searches are complete
+		while (!mStop && [searches count] != 0) {
+			[searches filterUsingPredicate:[NSPredicate predicateWithBlock:^ BOOL (id evaluatedObject, NSDictionary *bindings) {
+				return !((MetadataSearch *)evaluatedObject).isDone;
+			}]];
+			
+			usleep(100000);
+		}
 		
-		usleep(100000);
+		if ([searches count] != 0) {
+			for (MetadataSearch *search in searches)
+				[search stop];
+		}
+		
+		[self performSelectorOnMainThread:@selector(magicalSearchDone) withObject:nil waitUntilDone:FALSE];
 	}
-	
-	if ([searches count] != 0) {
-		for (MetadataSearch *search in searches)
-			[search stop];
-	}
-	
-	[self performSelectorOnMainThread:@selector(magicalSearchDone) withObject:nil waitUntilDone:FALSE];
-	
-	[fileManager release];
-	[pool release];
 }
 
 /**
@@ -244,57 +241,57 @@
  */
 - (void)magicalSearchImportThread
 {
-	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-	ChatterObjectCache *cache = [[ChatterObjectCache sharedInstance] retain];
-	NSUInteger filesTotal = 0;
-	
-	for (NSString *serviceName in [mDataByService  allKeys]) {
-		NSDictionary *serviceInfo = [mDataByService objectForKey:serviceName];
-		
-		if (NSOnState != [[serviceInfo objectForKey:@"State"] integerValue])
-			continue;
-		
-		filesTotal += [[serviceInfo objectForKey:@"Count"] integerValue];
-	}
-	
-	mImportFilesTotal = filesTotal;
-	mImportImporting = TRUE;
-	mImportScanning = FALSE;
-	
-	for (NSString *serviceName in [mDataByService  allKeys]) {
-		NSAutoreleasePool *pool2 = [[NSAutoreleasePool alloc] init];
-		NSDictionary *serviceInfo = [mDataByService objectForKey:serviceName];
-		id<ServiceImporter> importer = [ServiceImporter importerForName:serviceName];
-		
-		if (NSOnState == [[serviceInfo objectForKey:@"State"] integerValue]) {
-			for (NSString *filePath in [[serviceInfo objectForKey:@"Files"] allValues]) {
-				mImportFilesDone += 1;
-				[self importFile:filePath importer:importer];
-				
-				// this check stops an import after the message count reaches 10,000, but it's placement allows
-				// a user to continue to import one file at a time thereafter.
+	@autoreleasepool {
 #ifdef CHATTER_DEMO
-				if ([cache messageCount] >= 10000) {
-					[pool2 release];
-					goto done;
-				}
+		ChatterObjectCache *cache = [ChatterObjectCache sharedInstance];
 #endif
+		NSUInteger filesTotal = 0;
+		
+		for (NSString *serviceName in [mDataByService  allKeys]) {
+			NSDictionary *serviceInfo = [mDataByService objectForKey:serviceName];
+			
+			if (NSOnState != [[serviceInfo objectForKey:@"State"] integerValue])
+				continue;
+			
+			filesTotal += [[serviceInfo objectForKey:@"Count"] integerValue];
+		}
+		
+		mImportFilesTotal = filesTotal;
+		mImportImporting = TRUE;
+		mImportScanning = FALSE;
+		
+		for (NSString *serviceName in [mDataByService  allKeys]) {
+			@autoreleasepool {
+				NSDictionary *serviceInfo = [mDataByService objectForKey:serviceName];
+				id<ServiceImporter> importer = [ServiceImporter importerForName:serviceName];
+				
+				if (NSOnState == [[serviceInfo objectForKey:@"State"] integerValue]) {
+					for (NSString *filePath in [[serviceInfo objectForKey:@"Files"] allValues]) {
+						mImportFilesDone += 1;
+						[self importFile:filePath importer:importer];
+						
+						// this check stops an import after the message count reaches 10,000, but it's placement allows
+						// a user to continue to import one file at a time thereafter.
+#ifdef CHATTER_DEMO
+						if ([cache messageCount] >= 10000) {
+							[pool2 release];
+							goto done;
+						}
+#endif
+					}
+				}
+			
 			}
 		}
 		
-		[pool2 release];
-	}
-	
 done:
-	// clean up and cause the progress sheet to finish
-	{
-		[mImportFileName autorelease];
-		mImportFileName = nil;
-		mImportDone = TRUE;
+		// clean up and cause the progress sheet to finish
+		{
+			mImportFileName = nil;
+			mImportDone = TRUE;
+		}
+		
 	}
-	
-	[cache release];
-	[pool release];
 }
 
 
@@ -313,8 +310,7 @@ done:
 	[mData removeAllObjects];
 	[mDataByService removeAllObjects];
 	
-	[mParentWindow release];
-	mParentWindow = [window retain];
+	mParentWindow = window;
 	
 	// clear out previously used data
 	[mData removeAllObjects];
@@ -406,8 +402,7 @@ done:
 			NSArray *urls = [panel URLs];
 			
 			if ([urls count] != 0) {
-				[mLastImportUrl release];
-				mLastImportUrl = [[[urls objectAtIndex:0] URLByDeletingLastPathComponent] retain];
+				mLastImportUrl = [[urls objectAtIndex:0] URLByDeletingLastPathComponent];
 				
 				[mProgressSheetController setTitle:@"Importing chat logs. Please wait...."];
 				[mProgressSheetController setSubtitle:@""];
@@ -432,18 +427,16 @@ done:
  */
 - (void)importFile:(NSString *)filePath importer:(id<ServiceImporter>)importer
 {
-	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-	NSFileManager *fileManager = [[NSFileManager alloc] init];
 	ChatterObjectCache *cache = [ChatterObjectCache sharedInstance];
 	
 	//
 	// search address book for a person for this account
 	//
 	void (^searchForPerson)(ChatterAccount*) = ^ (ChatterAccount *caccount) {
-		ABSearchElementRef emailSearchRef = ABPersonCreateSearchElement((CFStringRef)kABEmailProperty, NULL, NULL, caccount.screenname, kABEqualCaseInsensitive);
-		ABSearchElementRef imSearchRef = ABPersonCreateSearchElement((CFStringRef)kABInstantMessageProperty, NULL, NULL, caccount.screenname, kABEqualCaseInsensitive);
-		NSArray *emailResults = (NSArray *)ABCopyArrayOfMatchingRecords((ABAddressBookRef)[ABAddressBook addressBook], emailSearchRef);
-		NSArray *imResults = (NSArray *)ABCopyArrayOfMatchingRecords((ABAddressBookRef)[ABAddressBook addressBook], imSearchRef);
+		ABSearchElementRef emailSearchRef = ABPersonCreateSearchElement((CFStringRef)kABEmailProperty, NULL, NULL, (__bridge CFTypeRef)(caccount.screenname), kABEqualCaseInsensitive);
+		ABSearchElementRef imSearchRef = ABPersonCreateSearchElement((CFStringRef)kABInstantMessageProperty, NULL, NULL, (__bridge CFTypeRef)(caccount.screenname), kABEqualCaseInsensitive);
+		NSArray *emailResults = (__bridge_transfer NSArray *)ABCopyArrayOfMatchingRecords((__bridge ABAddressBookRef)[ABAddressBook addressBook], emailSearchRef);
+		NSArray *imResults = (__bridge_transfer NSArray *)ABCopyArrayOfMatchingRecords((__bridge ABAddressBookRef)[ABAddressBook addressBook], imSearchRef);
 		ABPerson *person = nil;
 		
 		if ([imResults count] != 0)
@@ -462,7 +455,7 @@ done:
 			NSImage *image = nil;
 			
 			if (imageData != nil)
-				image = [[[NSImage alloc] initWithData:imageData] autorelease];
+				image = [[NSImage alloc] initWithData:imageData];
 			
 			cperson = [ChatterPerson person];
 			cperson.firstName = [person valueForProperty:kABFirstNameProperty];
@@ -477,8 +470,6 @@ done:
 		
 		caccount.person = cperson;
 		
-		CFRelease((CFArrayRef)emailResults);
-		CFRelease((CFArrayRef)imResults);
 		CFRelease(emailSearchRef);
 		CFRelease(imSearchRef);
 	};
@@ -548,11 +539,7 @@ done:
 		ChatterSource *csource = [cache sourceForPath:filePath];
 		NSMutableIndexSet *accountIds = [NSMutableIndexSet indexSet];
 		
-		{
-			NSString *importFileName = mImportFileName;
-			mImportFileName = [[filePath lastPathComponent] retain];
-			[importFileName release];
-		}
+		mImportFileName = [filePath lastPathComponent];
 		
 		if (csource != nil) {
 			if ([csource.service isEqualToString:[[importer class] name]] && [csource.timestamp timeIntervalSince1970] == (mtime = [Easy mtimeForFilePath:filePath]))
@@ -594,10 +581,7 @@ done:
 		[[Easy dbconn] commitTransaction];
 	};
 	
-	importFile(filePath, importer);
-	
-	[pool release];
-	[fileManager release];
+	@autoreleasepool { importFile(filePath, importer); }
 }
 
 /**
@@ -607,9 +591,8 @@ done:
  */
 - (void)doActionImportThread:(NSArray *)urls
 {
-	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
 	NSFileManager *fileManager = [[NSFileManager alloc] init];
-	__block NSMutableDictionary *filesToImport = [NSMutableDictionary dictionary];
+	NSMutableDictionary *filesToImport = [NSMutableDictionary dictionary];
 	id<ServiceImporter> defaultImporter = mManualImporter;
 	
 	mImportFilesTotal = 0;
@@ -623,47 +606,43 @@ done:
 	// appropriate importer, we will hand every file and directory to the user-specified importer.
 	//
 	for (NSURL *url in urls) {
-		NSAutoreleasePool *pool2 = [[NSAutoreleasePool alloc] init];
-		BOOL isDir;
-		NSString *targetPath = [url path];
-		__block id<ServiceImporter> importer;
-		
-		if ([fileManager fileExistsAtPath:targetPath isDirectory:&isDir]) {
-			[mImportFileName release];
-			mImportFileName = [targetPath retain];
+		@autoreleasepool {
+			BOOL isDir;
+			NSString *targetPath = [url path];
+			__block id<ServiceImporter> importer;
 			
-			if (defaultImporter) {
-				[filesToImport setObject:defaultImporter forKey:targetPath];
-				mImportFilesTotal += 1;
+			if ([fileManager fileExistsAtPath:targetPath isDirectory:&isDir]) {
+				mImportFileName = targetPath;
 				
-				if (isDir) {
+				if (defaultImporter) {
+					[filesToImport setObject:defaultImporter forKey:targetPath];
+					mImportFilesTotal += 1;
+					
+					if (isDir) {
+						[Easy iterateDirectory:targetPath withHandle:(^ (NSString *filePath) {
+							mImportFileName = filePath;
+							[filesToImport setObject:defaultImporter forKey:filePath];
+							mImportFilesTotal += 1;
+						})];
+					}
+				}
+				else if (nil != (importer = [ServiceImporter importerForFilePath:targetPath])) {
+					[filesToImport setObject:importer forKey:targetPath];
+					mImportFilesTotal += 1;
+				}
+				else if (isDir) {
 					[Easy iterateDirectory:targetPath withHandle:(^ (NSString *filePath) {
-						[mImportFileName release];
-						mImportFileName = [filePath retain];
-						[filesToImport setObject:defaultImporter forKey:filePath];
-						mImportFilesTotal += 1;
+						@autoreleasepool {
+							if (nil != (importer = [ServiceImporter importerForFilePath:filePath])) {
+								mImportFileName = filePath;
+								[filesToImport setObject:importer forKey:filePath];
+								mImportFilesTotal += 1;
+							}
+						}
 					})];
 				}
 			}
-			else if (nil != (importer = [ServiceImporter importerForFilePath:targetPath])) {
-				[filesToImport setObject:importer forKey:targetPath];
-				mImportFilesTotal += 1;
-			}
-			else if (isDir) {
-				[Easy iterateDirectory:targetPath withHandle:(^ (NSString *filePath) {
-					NSAutoreleasePool *pool3 = [[NSAutoreleasePool alloc] init];
-					if (nil != (importer = [ServiceImporter importerForFilePath:filePath])) {
-						[mImportFileName release];
-						mImportFileName = [filePath retain];
-						[filesToImport setObject:importer forKey:filePath];
-						mImportFilesTotal += 1;
-					}
-					[pool3 release];
-				})];
-			}
 		}
-		
-		[pool2 release];
 	}
 	
 	mImportFilesTotal = [filesToImport count];
@@ -671,33 +650,27 @@ done:
 	mImportScanning = FALSE;
 	
 	for (NSString *filePath in [filesToImport allKeys]) {
-		NSAutoreleasePool *pool2 = [[NSAutoreleasePool alloc] init];
-		id<ServiceImporter> importer = [filesToImport objectForKey:filePath];
-		
-		mImportFilesDone += 1;
-		[self importFile:filePath importer:importer];
-		
-		// this check stops an import after the message count reaches 10,000, but it's placement allows
-		// a user to continue to import one file at a time thereafter.
+		@autoreleasepool {
+			id<ServiceImporter> importer = [filesToImport objectForKey:filePath];
+			
+			mImportFilesDone += 1;
+			[self importFile:filePath importer:importer];
+			
+			// this check stops an import after the message count reaches 10,000, but it's placement allows
+			// a user to continue to import one file at a time thereafter.
 #ifdef CHATTER_DEMO
-		if ([cache messageCount] >= 10000) {
-			[pool2 release];
-			break;
-		}
+			if ([cache messageCount] >= 10000)
+				break;
 #endif
-		
-		[pool2 release];
+		}
 	}
 	
 	// clean up and cause the progress sheet to finish
 	{
-		[mImportFileName autorelease];
 		mImportFileName = nil;
 		mImportDone = TRUE;
 	}
 	
-	[fileManager release];
-	[pool release];
 }
 
 /**
@@ -706,7 +679,7 @@ done:
  */
 - (void)doActionImportUpdateProgress:(NSTimer *)timer
 {
-	NSString *fileName = [mImportFileName retain];;
+	NSString *fileName = mImportFileName;;
 	
 	if (mImportScanning) {
 		if (fileName == nil)
@@ -726,7 +699,6 @@ done:
 	else
 		[mProgressSheetController setSubtitle:@""];
 	
-	[fileName release];
 	
 	if (mImportDone == TRUE) {
 		[timer invalidate];
@@ -769,10 +741,10 @@ done:
 		NSString *serviceName = [mData objectAtIndex:rowIndex];
 		NSDictionary *serviceInfo = [mDataByService objectForKey:serviceName];
 		
-		number = [[serviceInfo objectForKey:@"State"] retain];
+		number = [serviceInfo objectForKey:@"State"];
 	}
 	
-	return [number autorelease];
+	return number;
 }
 
 
@@ -804,12 +776,12 @@ done:
 	@synchronized (mData) {
 		serviceName = [mData objectAtIndex:row];
 		serviceInfo = [mDataByService objectForKey:serviceName];
-		state = [[serviceInfo objectForKey:@"State"] retain];
-		count = [[serviceInfo objectForKey:@"Count"] retain];
+		state = [serviceInfo objectForKey:@"State"];
+		count = [serviceInfo objectForKey:@"Count"];
 	}
 	
 	if (checkbox == nil) {
-		checkbox = [[[NSButton alloc] initWithFrame:NSMakeRect(0., 0., tableView.frame.size.width, 14.)] autorelease];
+		checkbox = [[NSButton alloc] initWithFrame:NSMakeRect(0., 0., tableView.frame.size.width, 14.)];
 		checkbox.identifier = @"SearchResult";
 		checkbox.target = self;
 		checkbox.action = @selector(doActionMagicalCheckboxToggled:);
@@ -820,8 +792,6 @@ done:
 	[checkbox setState:[state integerValue]];
 	[checkbox setTitle:[NSString stringWithFormat:@"%@ %@ log files", count, serviceName]];
 	
-	[state release];
-	[count release];
 	
 	return checkbox;
 }

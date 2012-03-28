@@ -59,19 +59,6 @@
 	mAccountsTbl->mController = self;
 }
 
-/**
- *
- *
- */
-- (void)dealloc
-{
-	[mAccount release];
-	[mPerson release];
-	[mAccounts release];
-	
-	[super dealloc];
-}
-
 
 
 
@@ -287,8 +274,7 @@ done:
 		if ([object isKindOfClass:[ABPerson class]]) {
 			ABPerson *abperson = (ABPerson *)object;
 			
-			[mAddressBookUid release];
-			mAddressBookUid = [[abperson valueForProperty:kABUIDProperty] retain];
+			mAddressBookUid = [abperson valueForProperty:kABUIDProperty];
 			
 			NSString *abfirst = [abperson valueForProperty:kABFirstNameProperty];
 			NSString *ablast = [abperson valueForProperty:kABLastNameProperty];
@@ -298,7 +284,7 @@ done:
 			[mLastNameTxt setStringValue:ablast];
 			
 			if (imageData)
-				[mProfileImg setImage:[[[NSImage alloc] initWithData:imageData] autorelease]];
+				[mProfileImg setImage:[[NSImage alloc] initWithData:imageData]];
 			else
 				[mProfileImg setImage:nil];
 			

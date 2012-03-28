@@ -61,7 +61,7 @@ done_good:
 	retval = TRUE;
 	
 done_fail:
-	[fileManager release];
+	;
 	return retval;
 }
 
@@ -111,11 +111,9 @@ done_fail:
 	NSFileManager *fileManager = [[NSFileManager alloc] init];
 	
 	if (![fileManager fileExistsAtPath:filePath isDirectory:&isDir] || isDir) {
-		[fileManager release];
 		return FALSE;
 	}
 	
-	[fileManager release];
 	
 	return [self importData:[NSData dataWithContentsOfFile:filePath] withMessageClass:messageClass andHandler:handler];
 }
@@ -126,35 +124,34 @@ done_fail:
  */
 - (BOOL)importData:(NSData *)fileData withMessageClass:(Class<ServiceImporterMessage>)messageClass andHandler:(ServiceImporterMessageCallback)handler
 {
-	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-	NSMutableData *xmlData = [NSMutableData data];
-	NSXMLParser *parser;
-	const unsigned char *fileBytes = (const unsigned char *)[fileData bytes];
+	@autoreleasepool {
+		NSMutableData *xmlData = [NSMutableData data];
+		NSXMLParser *parser;
+		const unsigned char *fileBytes = (const unsigned char *)[fileData bytes];
+		
+		mMessageClass = messageClass;
+		mHandler = handler;
+		
+		if ([fileData length] < 3)
+			return FALSE;
+		
+		if (fileBytes[0] != 0xEF || fileBytes[1] != 0xBB || fileBytes[2] != 0xBF)
+			return FALSE;
+		
+		[xmlData appendBytes:"<?xml version=\"1.0\" encoding=\"UTF-8\" ?><chat>" length:45];
+		[xmlData appendBytes:fileBytes+3 length:[fileData length]-3];
+		[xmlData appendBytes:"</chat>\n" length:8];
+		
+		parser = [[NSXMLParser alloc] initWithData:xmlData];
+		
+		mHandler = handler;
+		
+		[parser setDelegate:self];
+		[parser parse];
+		
+		mHandler = nil;
 	
-	mMessageClass = messageClass;
-	mHandler = handler;
-	
-	if ([fileData length] < 3)
-		return FALSE;
-	
-	if (fileBytes[0] != 0xEF || fileBytes[1] != 0xBB || fileBytes[2] != 0xBF)
-		return FALSE;
-	
-	[xmlData appendBytes:"<?xml version=\"1.0\" encoding=\"UTF-8\" ?><chat>" length:45];
-	[xmlData appendBytes:fileBytes+3 length:[fileData length]-3];
-	[xmlData appendBytes:"</chat>\n" length:8];
-	
-	parser = [[NSXMLParser alloc] initWithData:xmlData];
-	
-	mHandler = handler;
-	
-	[parser setDelegate:self];
-	[parser parse];
-	[parser release];
-	
-	mHandler = nil;
-	
-	[pool release];
+	}
 	
 	return TRUE;
 }
@@ -180,7 +177,6 @@ done_fail:
  */
 - (void)parserDidEndDocument:(NSXMLParser *)parser
 {
-	[mServiceName release];
 	mServiceName = nil;
 }
 
@@ -192,8 +188,7 @@ done_fail:
 {
 	if (mInChat) {
 		if ([elementName isEqualToString:@"session"]) {
-			[mServiceName release];
-			mServiceName = [[attributeDict objectForKey:@"from"] retain];
+			mServiceName = [attributeDict objectForKey:@"from"];
 		}
 		else if ([elementName isEqualToString:@"message"]) {
 			id<ServiceImporterMessage> message = [[(Class)mMessageClass alloc] init];
@@ -208,7 +203,6 @@ done_fail:
 			if (stop)
 				[parser abortParsing];
 			
-			[message release];
 		}
 	}
 	else if ([elementName isEqualToString:@"chat"])

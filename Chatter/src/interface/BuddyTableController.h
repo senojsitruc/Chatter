@@ -16,7 +16,7 @@
 {
 @private
 	/* interface */
-	NSTableView *mTableView;
+	NSTableView *__weak mTableView;
 	
 	/* data */
 	NSMutableArray *mData;
@@ -26,7 +26,7 @@
 	NSTimer *mSelectionTimer;
 }
 
-@property (readwrite, assign) IBOutlet NSTableView *tableView;
+@property (readwrite, weak) IBOutlet NSTableView *tableView;
 
 - (void)loadData;
 

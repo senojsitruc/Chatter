@@ -29,22 +29,7 @@
  */
 + (id)source
 {
-	return [[[[self class] alloc] init] autorelease];
-}
-
-/**
- *
- *
- */
-- (void)dealloc
-{
-	[mService release];
-	[mFilePath release];
-	[mTimestamp release];
-	[mTimestampStr release];
-	[mAlias release];
-	
-	[super dealloc];
+	return [[[self class] alloc] init];
 }
 
 
@@ -75,8 +60,7 @@
 	if (mFilePath == filePath || [mFilePath isEqualToString:filePath])
 		return;
 	
-	[mFilePath release];
-	mFilePath = [filePath retain];
+	mFilePath = filePath;
 	
 	if (noErr != (error = FSNewAliasFromPath(NULL, [filePath cStringUsingEncoding:NSUTF8StringEncoding], 0, &mAliasHandle, NULL))) {
 		NSLog(@"%s.. failed to FSNewAliasFromPath(%@), %d", __PRETTY_FUNCTION__, filePath, error);
@@ -119,10 +103,7 @@
 	if (mTimestamp == timestamp)
 		return;
 	
-	[mTimestamp release];
-	mTimestamp = [timestamp retain];
-	
-	[mTimestampStr release];
+	mTimestamp = timestamp;
 	mTimestampStr = nil;
 }
 
